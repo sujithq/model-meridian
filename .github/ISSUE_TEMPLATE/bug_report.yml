@@ -1,0 +1,25 @@
+name: Bug report
+description: Report incorrect chart output or a reproducible command failure.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the command, CSV shape, and observed output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Python version and operating system.
+    validations:
+      required: true
