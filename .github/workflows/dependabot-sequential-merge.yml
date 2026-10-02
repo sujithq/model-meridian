@@ -32,8 +32,14 @@ jobs:
             --jq 'sort_by(.createdAt) | map(select(.isDraft == false)) | .[0].number // empty')
           if [ -z "$number" ]; then
             echo "No open non-draft Dependabot pull requests found."
+            echo "workflow_change=false" >> "$GITHUB_OUTPUT"
           else
+            workflow_change=$(gh pr view "$number" \
+              --json files \
+              --jq 'any(.files[]; .path | startswith(".github/workflows/"))')
             echo "Selected oldest Dependabot pull request: #$number"
+            echo "Changes workflow file: $workflow_change"
+            echo "workflow_change=$workflow_change" >> "$GITHUB_OUTPUT"
           fi
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
@@ -59,6 +65,16 @@ jobs:
         if: steps.oldest.outputs.number != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          MERGE_TOKEN: ${{ secrets.DEPENDABOT_MERGE_TOKEN }}
+          WORKFLOW_CHANGE: ${{ steps.oldest.outputs.workflow_change }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ steps.oldest.outputs.number }}
-        run: gh pr merge "$PR_NUMBER" --auto --squash --delete-branch
+        run: |
+          if [ "$WORKFLOW_CHANGE" = "true" ]; then
+            if [ -z "$MERGE_TOKEN" ]; then
+              echo "::error::The DEPENDABOT_MERGE_TOKEN repository secret is required for PRs that modify workflow files."
+              exit 1
+            fi
+            export GH_TOKEN="$MERGE_TOKEN"
+          fi
+          gh pr merge "$PR_NUMBER" --auto --squash --delete-branch

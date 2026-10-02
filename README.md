@@ -198,14 +198,20 @@ Before relying on the workflow, configure the repository once:
 1. Protect `main` and require the `CI / validate` check to pass.
 2. Require pull request branches to be up to date before merging.
 3. Enable pull request auto-merge.
-4. Allow the workflow token to merge pull requests under the repository's branch
-   protection policy.
+4. Create a repository secret named `DEPENDABOT_MERGE_TOKEN` containing a
+   dedicated token allowed to merge pull requests and update workflow files. This
+   token is used only when the oldest PR changes `.github/workflows/**`; ordinary
+   dependency PRs use the workflow's `GITHUB_TOKEN`. A classic personal access
+   token needs `repo` and `workflow` scopes; use the equivalent repository and
+   workflow permissions for a fine-grained token.
 
 The workflow is active for manual dispatches, Dependabot pull request events, and
 its hourly recovery schedule. It asks Dependabot to rebase the oldest pull request,
-waits for it to become clean, and then merges it directly with squash. If reviews
-are required, approve the Dependabot pull requests first. To pause the queue,
-disable the workflow temporarily or remove its write permissions.
+waits for it to become clean, and then enables squash auto-merge. The dedicated
+token is needed because GitHub's default `GITHUB_TOKEN` cannot merge a pull
+request that changes a workflow file. If reviews are required, approve the
+Dependabot pull requests first. To pause the queue, disable the workflow
+temporarily or remove its write permissions.
 
 ### GitHub Pages deployment
 
