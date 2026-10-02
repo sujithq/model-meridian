@@ -1,0 +1,60 @@
+name: Merge Dependabot updates sequentially
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, closed, ready_for_review]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-sequential-merge
+  cancel-in-progress: false
+
+jobs:
+  activate-oldest:
+    if: vars.DEPENDABOT_SEQUENTIAL_MERGE == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find oldest open Dependabot pull request
+        id: oldest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          number=$(gh pr list \
+            --state open \
+            --author app/dependabot \
+            --json number,createdAt,isDraft \
+            --jq 'sort_by(.createdAt) | map(select(.isDraft == false)) | .[0].number // empty')
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Request a fresh Dependabot rebase
+        if: steps.oldest.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.oldest.outputs.number }}
+        run: |
+          marker='<!-- dependabot-sequential-merge:activated -->'
+          activated=$(gh api \
+            "repos/$GH_REPO/issues/$PR_NUMBER/comments?per_page=100" \
+            --jq "any(.[]; .body | contains(\"$marker\"))")
+          merge_state=$(gh pr view "$PR_NUMBER" --json mergeStateStatus --jq .mergeStateStatus)
+
+          if [ "$activated" != "true" ] || [ "$merge_state" = "BEHIND" ]; then
+            body=$(printf '@dependabot rebase\n\n%s' "$marker")
+            gh pr comment "$PR_NUMBER" --body "$body"
+          fi
+
+      - name: Enable auto-merge for the oldest pull request
+        if: steps.oldest.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.oldest.outputs.number }}
+        run: gh pr merge "$PR_NUMBER" --auto --squash

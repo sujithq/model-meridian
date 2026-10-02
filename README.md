@@ -63,10 +63,12 @@ isolated behind the `ModelSource` protocol:
 - `scripts/export_artificial_analysis_csv.py` stays the CLI entry point and just
   wires the source to the pipeline.
 
-GitHub automation is configured with two workflows in [`.github/workflows/`](.github/workflows/):
+GitHub automation is configured in [`.github/workflows/`](.github/workflows/):
 
+- `ci.yml` compiles the Python source, runs the tests, and renders example outputs.
 - `data-export.yml` refreshes the original source data in `data/data.csv` on a daily schedule or on demand.
 - `deploy-pages.yml` builds `src/index.html` from the exported CSV and deploys it to GitHub Pages.
+- `dependabot-sequential-merge.yml` rebases and auto-merges Dependabot pull requests one at a time in creation order.
 
 ## Data source
 
@@ -181,6 +183,26 @@ All three evaluated frameworks are distributed under the MIT License:
 [Pico](scripts/page_assets/vendor/pico-2.1.1/LICENSE.md),
 [Bulma](scripts/page_assets/vendor/bulma-1.0.4/LICENSE), and
 [Tailwind CSS](scripts/page_assets/vendor/tailwind-4.3.3/LICENSE).
+
+### Sequential Dependabot updates
+
+Dependabot explicitly uses automatic rebasing for pip, npm, and GitHub Actions
+updates. The `dependabot-sequential-merge.yml` workflow selects only the oldest
+open non-draft Dependabot pull request, asks Dependabot to rebase it, and enables
+squash auto-merge. After that pull request closes, the next oldest pull request
+is activated. An hourly schedule recovers the process if an event is missed.
+
+The workflow is disabled by default. Before enabling it:
+
+1. Protect `main` and require the `CI / validate` check to pass.
+2. Require pull request branches to be up to date before merging.
+3. Enable pull request auto-merge in the repository settings.
+4. Create the repository Actions variable `DEPENDABOT_SEQUENTIAL_MERGE` with the
+   value `true`.
+
+If reviews are required, approve the Dependabot pull requests first; auto-merge
+waits for the approval and required checks. Set the variable to `false` to pause
+the queue without editing the workflow.
 
 ### GitHub Pages deployment
 
