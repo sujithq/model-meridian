@@ -16,19 +16,15 @@ opened directly from disk or published as a static page.
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import sys
 from pathlib import Path
 
 from chart_data import (
-    DEFAULT_COLOR,
     EFFORT_ORDER,
     build_series,
-    filter_points,
-    parse_model_name,
-    read_family_colors,
-    read_points,
+    filter_records,
+    read_model_records,
 )
 
 DASH_PATTERNS = ["", "7 4", "9 3 2 3", "3 2 1 2"]
@@ -815,30 +811,17 @@ def dash_for(linestyle: object, index: int) -> str:
     return DASH_PATTERNS[index % len(DASH_PATTERNS)]
 
 
-def read_model_urls(path: Path) -> dict[str, str]:
-    urls: dict[str, str] = {}
-    with path.open(newline="", encoding="utf-8-sig") as handle:
-        for row in csv.DictReader(handle):
-            name = (row.get("model") or "").strip()
-            if name:
-                urls.setdefault(name, (row.get("model_url") or "").strip())
-    return urls
-
-
 def build_payload(args: argparse.Namespace) -> tuple[list[dict], dict]:
     source = Path(args.csv)
-    points = read_points(source)
-    if not points:
+    records = read_model_records(source)
+    if not records:
         raise SystemExit(f"No usable rows found in {source}")
 
-    colors = read_family_colors(source)
-    urls = read_model_urls(source)
-
-    points = filter_points(points, args.min_score, args.max_cost, args.families)
-    if not points:
+    records = filter_records(records, args.min_score, args.max_cost, args.families)
+    if not records:
         raise SystemExit("All rows were filtered out; relax --min-score/--max-cost/--families")
 
-    series_list = build_series(points, colors)
+    series_list = build_series(records)
     if args.top:
         series_list = series_list[: args.top]
 
@@ -858,7 +841,7 @@ def build_payload(args: argparse.Namespace) -> tuple[list[dict], dict]:
                     "score": round(point.score, 4),
                     "color": series.color,
                     "dash": dash,
-                    "url": urls.get(point.model, ""),
+                    "url": point.model_url,
                 }
             )
 

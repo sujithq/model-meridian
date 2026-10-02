@@ -32,10 +32,9 @@ from matplotlib.ticker import FixedLocator, NullFormatter
 from chart_data import (
     build_series,
     cost_ticks,
-    filter_points,
+    filter_records,
     money,
-    read_family_colors,
-    read_points,
+    read_model_records,
 )
 
 
@@ -107,20 +106,18 @@ def place_labels(fig, ax, labels, obstacles=None) -> None:
 
 def build_chart(args: argparse.Namespace) -> Path:
     source = Path(args.csv)
-    points = read_points(source)
-    if not points:
+    records = read_model_records(source)
+    if not records:
         raise SystemExit(f"No usable rows found in {source}")
 
-    colors = read_family_colors(source)
-
-    points = filter_points(points, args.min_score, args.max_cost, args.families)
-    if not points:
+    records = filter_records(records, args.min_score, args.max_cost, args.families)
+    if not records:
         raise SystemExit("All rows were filtered out; relax --min-score/--max-cost/--families")
 
-    series_list = build_series(points, colors)
+    series_list = build_series(records)
     if args.top:
         series_list = series_list[: args.top]
-        points = [p for s in series_list for p in s.points]
+        records = [record for series in series_list for record in series.points]
 
     fig, ax = plt.subplots(figsize=(args.width, args.height), dpi=args.dpi)
     fig.patch.set_facecolor("white")
@@ -190,8 +187,8 @@ def build_chart(args: argparse.Namespace) -> Path:
                 )
                 labels.append((effort_label, False))
 
-    costs = [p.cost for p in points]
-    scores = [p.score for p in points]
+    costs = [record.cost for record in records]
+    scores = [record.score for record in records]
     ax.set_xscale("log")
     ax.set_xlim(min(costs) / 2.2, max(costs) * 2.6)
     score_pad = max(2.0, (max(scores) - min(scores)) * 0.08)
@@ -232,8 +229,8 @@ def build_chart(args: argparse.Namespace) -> Path:
     fig.tight_layout(rect=(0.01, 0.05, 0.99, 0.97))
     fig.canvas.draw()
     marker_boxes = []
-    for point in points:
-        x, y = ax.transData.transform((point.cost, point.score))
+    for record in records:
+        x, y = ax.transData.transform((record.cost, record.score))
         marker_boxes.append(matplotlib.transforms.Bbox.from_bounds(x - 4, y - 4, 8, 8))
     place_labels(fig, ax, labels, marker_boxes)
 

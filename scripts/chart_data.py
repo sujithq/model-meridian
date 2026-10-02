@@ -33,21 +33,24 @@ LINE_STYLES = ["-", "--", "-.", (0, (3, 1, 1, 1))]
 DEFAULT_COLOR = "#444444"
 
 
-@dataclass
-class Point:
+@dataclass(frozen=True, slots=True)
+class ModelRecord:
     model: str
     family: str
     effort: str
     fallback: bool
     cost: float
     score: float
+    source_color: str
+    id: str = ""
+    model_url: str = ""
 
 
 @dataclass
 class Series:
     family: str
     base_color: str
-    points: list[Point] = field(default_factory=list)
+    points: list[ModelRecord] = field(default_factory=list)
     color: str = "#333333"
     linestyle: object = "-"
 
@@ -67,15 +70,16 @@ def parse_model_name(name: str) -> tuple[str, str, bool]:
     return family, effort, fallback
 
 
-def effort_sort_key(point: Point) -> tuple[int, float]:
-    return (EFFORT_ORDER.get(point.effort.lower(), 99), point.cost)
+def effort_sort_key(record: ModelRecord) -> tuple[int, float]:
+    return (EFFORT_ORDER.get(record.effort.lower(), 99), record.cost)
 
 
-def read_points(path: Path) -> list[Point]:
+def read_model_records(path: Path) -> list[ModelRecord]:
+    """Load validated chart records from a CSV in one pass."""
     with path.open(newline="", encoding="utf-8-sig") as handle:
         rows = list(csv.DictReader(handle))
 
-    points: list[Point] = []
+    records: list[ModelRecord] = []
     for row in rows:
         name = (row.get("model") or "").strip()
         if not name:
@@ -88,23 +92,21 @@ def read_points(path: Path) -> list[Point]:
         if not math.isfinite(cost) or not math.isfinite(score) or cost <= 0:
             continue
         family, effort, fallback = parse_model_name(name)
-        points.append(Point(name, family, effort, fallback, cost, score))
-    return points
-
-
-def read_family_colors(path: Path) -> dict[str, str]:
-    """Map each model family to the first colour its rows declare."""
-    colors: dict[str, str] = {}
-    with path.open(newline="", encoding="utf-8-sig") as handle:
-        for row in csv.DictReader(handle):
-            name = (row.get("model") or "").strip()
-            if not name:
-                continue
-            family, _, _ = parse_model_name(name)
-            colors.setdefault(
-                family, (row.get("color") or DEFAULT_COLOR).strip() or DEFAULT_COLOR
+        records.append(
+            ModelRecord(
+                model=name,
+                family=family,
+                effort=effort,
+                fallback=fallback,
+                cost=cost,
+                score=score,
+                source_color=(row.get("color") or DEFAULT_COLOR).strip()
+                or DEFAULT_COLOR,
+                id=(row.get("id") or "").strip(),
+                model_url=(row.get("model_url") or "").strip(),
             )
-    return colors
+        )
+    return records
 
 
 def shade(hex_color: str, lightness_delta: float, hue_delta: float, variant: int = 0) -> str:
@@ -135,14 +137,14 @@ def shade(hex_color: str, lightness_delta: float, hue_delta: float, variant: int
     return "#{:02x}{:02x}{:02x}".format(int(r * 255), int(g * 255), int(b * 255))
 
 
-def build_series(points: list[Point], colors: dict[str, str]) -> list[Series]:
+def build_series(records: list[ModelRecord]) -> list[Series]:
     grouped: dict[str, Series] = {}
-    for point in points:
-        series = grouped.get(point.family)
+    for record in records:
+        series = grouped.get(record.family)
         if series is None:
-            series = Series(point.family, colors.get(point.family, DEFAULT_COLOR))
-            grouped[point.family] = series
-        series.points.append(point)
+            series = Series(record.family, record.source_color)
+            grouped[record.family] = series
+        series.points.append(record)
 
     for series in grouped.values():
         series.points.sort(key=effort_sort_key)
@@ -168,20 +170,24 @@ def build_series(points: list[Point], colors: dict[str, str]) -> list[Series]:
     return sorted(grouped.values(), key=lambda s: -max(p.score for p in s.points))
 
 
-def filter_points(
-    points: list[Point],
+def filter_records(
+    records: list[ModelRecord],
     min_score: float | None = None,
     max_cost: float | None = None,
     families: list[str] | None = None,
-) -> list[Point]:
+) -> list[ModelRecord]:
     if min_score is not None:
-        points = [p for p in points if p.score >= min_score]
+        records = [record for record in records if record.score >= min_score]
     if max_cost is not None:
-        points = [p for p in points if p.cost <= max_cost]
+        records = [record for record in records if record.cost <= max_cost]
     if families:
         wanted = [f.lower() for f in families]
-        points = [p for p in points if any(w in p.family.lower() for w in wanted)]
-    return points
+        records = [
+            record
+            for record in records
+            if any(wanted_family in record.family.lower() for wanted_family in wanted)
+        ]
+    return records
 
 
 def cost_ticks(lo: float, hi: float) -> list[float]:

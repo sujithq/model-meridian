@@ -8,14 +8,13 @@ from tests.helpers import write_fixture_csv
 
 from chart_data import (
     DEFAULT_COLOR,
-    Point,
+    ModelRecord,
     build_series,
     cost_ticks,
-    filter_points,
+    filter_records,
     money,
     parse_model_name,
-    read_family_colors,
-    read_points,
+    read_model_records,
     shade,
 )
 
@@ -38,53 +37,60 @@ class CsvLoadingTests(unittest.TestCase):
     def test_loads_valid_rows_and_skips_invalid_rows(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = write_fixture_csv(Path(directory) / "models.csv")
-            points = read_points(source)
+            records = read_model_records(source)
 
-        self.assertEqual([point.model for point in points], [
+        self.assertEqual([record.model for record in records], [
             "Alpha 1 (low with fallback)",
             "Alpha 1 (max)",
             "Beta",
         ])
-        self.assertTrue(points[0].fallback)
+        self.assertTrue(records[0].fallback)
+        self.assertEqual(records[0].id, "alpha-low")
+        self.assertEqual(records[0].model_url, "https://example.test/alpha-low")
 
-    def test_uses_first_declared_family_color(self) -> None:
+    def test_optional_fields_and_extra_columns(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            source = write_fixture_csv(Path(directory) / "models.csv")
-            colors = read_family_colors(source)
+            source = Path(directory) / "minimal.csv"
+            source.write_text(
+                "model,cost_per_task_usd,intelligence_index,color,ignored\n"
+                "Minimal,0.5,10,,extra\n",
+                encoding="utf-8",
+            )
+            records = read_model_records(source)
 
-        self.assertEqual(colors["Alpha 1"], "#1f1f1f")
-        self.assertEqual(colors["Beta"], "#ff0000")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].id, "")
+        self.assertEqual(records[0].model_url, "")
+        self.assertEqual(records[0].source_color, DEFAULT_COLOR)
 
 
 class SeriesAndFilterTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.points = [
-            Point("Alpha (max)", "Alpha", "max", False, 2.0, 50.0),
-            Point("Alpha (low)", "Alpha", "low", False, 1.0, 40.0),
-            Point("Beta", "Beta", "", False, 0.5, 45.0),
-            Point("Gamma", "Gamma", "", False, 0.2, 30.0),
+        self.records = [
+            ModelRecord("Alpha (max)", "Alpha", "max", False, 2.0, 50.0, "#1f1f1f"),
+            ModelRecord("Alpha (low)", "Alpha", "low", False, 1.0, 40.0, "#ff00ff"),
+            ModelRecord("Beta", "Beta", "", False, 0.5, 45.0, "#1f1f1f"),
+            ModelRecord("Gamma", "Gamma", "", False, 0.2, 30.0, "#00aa00"),
         ]
 
     def test_build_series_orders_families_and_efforts(self) -> None:
-        series = build_series(
-            self.points,
-            {"Alpha": "#1f1f1f", "Beta": "#1f1f1f", "Gamma": "#00aa00"},
-        )
+        series = build_series(self.records)
 
         self.assertEqual([item.family for item in series], ["Alpha", "Beta", "Gamma"])
         self.assertEqual([point.effort for point in series[0].points], ["low", "max"])
+        self.assertEqual(series[0].base_color, "#1f1f1f")
         self.assertNotEqual(series[0].color, series[1].color)
 
     def test_filter_combines_score_cost_and_family(self) -> None:
-        filtered = filter_points(
-            self.points,
+        filtered = filter_records(
+            self.records,
             min_score=40,
             max_cost=1.5,
             families=["alp", "beta"],
         )
 
         self.assertEqual([point.model for point in filtered], ["Alpha (low)", "Beta"])
-        self.assertEqual(len(self.points), 4)
+        self.assertEqual(len(self.records), 4)
 
     def test_formatting_and_tick_fallbacks(self) -> None:
         self.assertEqual(money(2.4), "$2")

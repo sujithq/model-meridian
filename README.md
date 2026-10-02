@@ -18,6 +18,9 @@ The generators live under [`scripts/`](scripts/) and share the same data model i
 | `scripts/generate_chart.py` | Static PNG image | Slides, documents, reports |
 | `scripts/generate_page.py` | Self-contained interactive HTML page | Exploring the data with hover details and live filtering |
 
+Each renderer loads the CSV once into shared typed model records containing the
+parsed family, effort, score, cost, source color, and optional model URL.
+
 GitHub automation is configured with two workflows in [`.github/workflows/`](.github/workflows/):
 
 - `data-export.yml` refreshes the original source data in `data/data.csv` on a daily schedule or on demand.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from tests.helpers import write_fixture_csv
@@ -35,10 +36,20 @@ class StaticChartTests(unittest.TestCase):
                 effort_fontsize=6.0,
             )
 
-            result = build_chart(args)
+            original_open = Path.open
+            opened_sources: list[Path] = []
+
+            def tracked_open(path: Path, *args, **kwargs):
+                if path == source:
+                    opened_sources.append(path)
+                return original_open(path, *args, **kwargs)
+
+            with mock.patch.object(Path, "open", tracked_open):
+                result = build_chart(args)
             content = result.read_bytes()
 
         self.assertEqual(result, output)
+        self.assertEqual(opened_sources, [source])
         self.assertTrue(content.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertGreater(len(content), 5_000)
 

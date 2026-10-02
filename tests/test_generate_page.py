@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
-from tests.helpers import write_fixture_csv
+from tests.helpers import FIELDNAMES, write_fixture_csv
 
 from generate_page import build_page, build_payload
 
@@ -52,6 +54,54 @@ class PagePayloadTests(unittest.TestCase):
             records, _ = build_payload(args)
 
         self.assertEqual([record["model"] for record in records], ["Beta"])
+
+    def test_duplicate_labels_keep_row_specific_urls(self) -> None:
+        rows = [
+            {
+                "id": "duplicate-a",
+                "model": "Duplicate",
+                "cost_per_task_usd": "1",
+                "intelligence_index": "20",
+                "model_url": "https://example.test/a",
+                "color": "#123456",
+            },
+            {
+                "id": "duplicate-b",
+                "model": "Duplicate",
+                "cost_per_task_usd": "2",
+                "intelligence_index": "30",
+                "model_url": "https://example.test/b",
+                "color": "#123456",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "duplicates.csv"
+            with source.open("w", encoding="utf-8-sig", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
+                writer.writeheader()
+                writer.writerows(rows)
+            records, _ = build_payload(page_args(source))
+
+        self.assertEqual(
+            {(record["cost"], record["url"]) for record in records},
+            {(1.0, "https://example.test/a"), (2.0, "https://example.test/b")},
+        )
+
+    def test_payload_opens_input_csv_once(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            original_open = Path.open
+            opened_sources: list[Path] = []
+
+            def tracked_open(path: Path, *args, **kwargs):
+                if path == source:
+                    opened_sources.append(path)
+                return original_open(path, *args, **kwargs)
+
+            with mock.patch.object(Path, "open", tracked_open):
+                build_payload(page_args(source))
+
+        self.assertEqual(opened_sources, [source])
 
 
 class GeneratedPageTests(unittest.TestCase):
