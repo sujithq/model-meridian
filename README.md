@@ -119,6 +119,9 @@ The page supports:
 - **Reasoning effort and family checkboxes** — toggle individual series.
 - **Display toggles** — connect efforts within a family, show family labels, and
   show per-point effort labels.
+- **Responsive wide-screen layout** — ultrawide viewports use a height-aware,
+  wider chart canvas so the lower axis and status remain visible without
+  stretching the plot.
 
 `generate_page.py` accepts the same `--min-score`, `--max-cost`, `--families`,
 and `--top` flags to bake a starting subset into the page.

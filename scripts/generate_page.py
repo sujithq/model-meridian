@@ -159,6 +159,10 @@ TEMPLATE = """<!DOCTYPE html>
     background: #fff;
   }
   svg { width: 100%; height: auto; display: block; }
+  @media (min-width: 1200px) and (min-aspect-ratio: 2/1) {
+    .chart-wrap { height: clamp(420px, calc(100dvh - 220px), 900px); }
+    .chart-wrap svg { height: 100%; }
+  }
   .status {
     font-size: 13px;
     color: var(--muted);
@@ -267,7 +271,21 @@ const TICK_LADDER = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5,
                      1, 2, 5, 10, 20, 50, 100, 200, 500];
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PAD = { top: 56, right: 40, bottom: 78, left: 86 };
-const W = 1600, H = 900;
+const BASE_W = 1600, H = 900;
+let W = BASE_W;
+
+function syncResponsiveChart() {
+  const compact = window.matchMedia(
+    "(min-width: 1200px) and (min-aspect-ratio: 2/1)"
+  ).matches;
+  const nextWidth = compact && svg.clientHeight
+    ? Math.max(BASE_W, Math.round((H * svg.clientWidth) / svg.clientHeight))
+    : BASE_W;
+  if (nextWidth === W) return false;
+  W = nextWidth;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  return true;
+}
 
 const svg = document.getElementById("chart");
 const tooltip = document.getElementById("tooltip");
@@ -757,6 +775,13 @@ els.showEffortLabels.addEventListener("change", render);
 els.selectAll.addEventListener("click", selectAllChecks);
 els.reset.addEventListener("click", resetFilters);
 window.addEventListener("scroll", hideTooltip, { passive: true });
+let resizeFrame = 0;
+window.addEventListener("resize", () => {
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(() => {
+    if (syncResponsiveChart()) render();
+  });
+}, { passive: true });
 
 // Scrolling the filter panel must not nudge a slider sitting under the cursor.
 [els.minScore, els.maxCost].forEach((slider) => {
@@ -765,6 +790,7 @@ window.addEventListener("scroll", hideTooltip, { passive: true });
     requestAnimationFrame(() => {
       if (slider.value !== before) {
         slider.value = before;
+        syncResponsiveChart();
         render();
       }
     });
