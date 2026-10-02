@@ -15,12 +15,12 @@ __STYLES__
 </header>
 
 <div class="layout">
-  <aside class="panel">
+  <aside class="panel __PANEL_CLASSES__">
     <h2>Filters</h2>
 
     <div class="field">
       <label for="search">Search models or families</label>
-      <input type="search" id="search" placeholder="e.g. opus, gpt-6, gemini" autocomplete="off">
+      <input type="search" id="search" class="__SEARCH_CLASSES__" placeholder="e.g. opus, gpt-6, gemini" autocomplete="off">
       <p class="hint">Separate multiple terms with commas to combine them.</p>
     </div>
 
@@ -50,14 +50,14 @@ __STYLES__
       <label><input type="checkbox" id="showEffortLabels"> Show effort labels</label>
     </div>
 
-    <div class="row">
-      <button type="button" id="selectAll">Select all</button>
-      <button type="button" id="reset">Reset</button>
+    <div class="row __ACTION_CLASSES__">
+      <button type="button" id="selectAll" class="__BUTTON_CLASSES__">Select all</button>
+      <button type="button" id="reset" class="__BUTTON_CLASSES__">Reset</button>
     </div>
   </aside>
 
   <main>
-    <div class="chart-wrap">
+    <div class="chart-wrap __CHART_CLASSES__">
       <svg id="chart" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" role="img"
            aria-label="Intelligence score versus cost per task"></svg>
       <div class="empty" id="empty" hidden>No models match the current filters.</div>

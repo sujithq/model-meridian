@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Optional Pico CSS 2.1.1 page theme using locally embedded, MIT-licensed
+  framework assets and a focused chart/control adapter.
+- Optional Bulma 1.0.4 and Tailwind CSS 4.3.3 page themes using pinned local
+  framework assets; Tailwind source can be rebuilt with the locked npm
+  development toolchain.
 - Model Meridian product branding for the interactive page and static chart.
 - Responsive, non-distorting chart sizing for ultrawide screens.
 - Characterization tests for shared chart data, both renderers, and CSV export

@@ -15,6 +15,7 @@ import page_builder
 from chart_data import ChartText, DataFilters
 from generate_page import parse_args
 from page_builder import (
+    ASSET_DIR,
     SCRIPT_ASSETS,
     THEME_SPECS,
     PageOptions,
@@ -149,6 +150,13 @@ class PagePayloadTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 parse_args(["models.csv", "--theme", "unknown"])
 
+    def test_parse_args_selects_framework_theme(self) -> None:
+        for theme in (PageTheme.PICO, PageTheme.BULMA, PageTheme.TAILWIND):
+            with self.subTest(theme=theme):
+                options = parse_args(["models.csv", "--theme", theme.value])
+
+                self.assertEqual(options.theme, theme)
+
 
 class GeneratedPageTests(unittest.TestCase):
     def test_page_is_self_contained_and_escapes_visible_text(self) -> None:
@@ -193,6 +201,62 @@ class GeneratedPageTests(unittest.TestCase):
             THEME_SPECS[PageTheme.NATIVE],
             ThemeSpec(styles=("base.css", "themes/native.css")),
         )
+
+    def test_pico_theme_embeds_pinned_framework_between_base_and_adapter(self) -> None:
+        styles = read_styles(PageTheme.PICO)
+
+        base_position = styles.index("* { box-sizing: border-box; }")
+        framework_position = styles.index("Pico CSS")
+        adapter_position = styles.index("--pico-font-size: 100%;")
+        self.assertLess(base_position, framework_position)
+        self.assertLess(framework_position, adapter_position)
+        self.assertIn("v2.1.1", styles)
+
+    def test_pico_page_is_self_contained(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            options = page_options(source)
+            html = assemble_page(payload_for(options), options.text, PageTheme.PICO)
+
+        self.assertIn("Pico CSS", html)
+        self.assertIn("themes/pico.css", str(THEME_SPECS[PageTheme.PICO].styles))
+        self.assertNotIn('<link rel="stylesheet"', html)
+        self.assertNotIn("https://cdn.", html)
+
+    def test_bulma_theme_embeds_framework_adapter_and_component_classes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            options = page_options(source)
+            html = assemble_page(payload_for(options), options.text, PageTheme.BULMA)
+
+        self.assertIn("bulma.io v1.0.4", html)
+        self.assertIn(".panel.box", html)
+        self.assertIn('class="panel box"', html)
+        self.assertIn('class="input is-small"', html)
+        self.assertIn('class="button is-small"', html)
+
+    def test_tailwind_theme_embeds_compiled_framework_and_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            options = page_options(source)
+            html = assemble_page(payload_for(options), options.text, PageTheme.TAILWIND)
+
+        self.assertIn("tailwindcss v4.3.3", html)
+        self.assertIn(".chart-wrap", html)
+        self.assertNotIn('<link rel="stylesheet"', html)
+
+    def test_framework_assets_are_local_and_licensed(self) -> None:
+        assets = {
+            PageTheme.PICO: "vendor/pico-2.1.1/LICENSE.md",
+            PageTheme.BULMA: "vendor/bulma-1.0.4/LICENSE",
+            PageTheme.TAILWIND: "vendor/tailwind-4.3.3/LICENSE",
+        }
+        for theme, license_name in assets.items():
+            with self.subTest(theme=theme):
+                styles = read_styles(theme)
+                self.assertNotIn("@import", styles)
+                self.assertNotIn("url(http", styles)
+                self.assertTrue((ASSET_DIR / license_name).is_file())
 
     def test_unsupported_theme_fails_explicitly(self) -> None:
         with self.assertRaisesRegex(ValueError, "Unsupported page theme"):

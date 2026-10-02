@@ -21,15 +21,49 @@ SCRIPT_ASSETS = (
 
 class PageTheme(str, Enum):
     NATIVE = "native"
+    PICO = "pico"
+    BULMA = "bulma"
+    TAILWIND = "tailwind"
 
 
 @dataclass(frozen=True, slots=True)
 class ThemeSpec:
     styles: tuple[str, ...]
+    classes: tuple[tuple[str, str], ...] = ()
+
+    def class_for(self, role: str) -> str:
+        return dict(self.classes).get(role, "")
 
 
 THEME_SPECS = {
     PageTheme.NATIVE: ThemeSpec(styles=("base.css", "themes/native.css")),
+    PageTheme.PICO: ThemeSpec(
+        styles=(
+            "base.css",
+            "vendor/pico-2.1.1/pico.min.css",
+            "themes/pico.css",
+        )
+    ),
+    PageTheme.BULMA: ThemeSpec(
+        styles=(
+            "base.css",
+            "vendor/bulma-1.0.4/bulma.min.css",
+            "themes/bulma.css",
+        ),
+        classes=(
+            ("panel", "box"),
+            ("search", "input is-small"),
+            ("actions", "buttons"),
+            ("button", "button is-small"),
+            ("chart", "box"),
+        ),
+    ),
+    PageTheme.TAILWIND: ThemeSpec(
+        styles=(
+            "base.css",
+            "vendor/tailwind-4.3.3/tailwind.min.css",
+        )
+    ),
 }
 
 
@@ -70,11 +104,14 @@ def read_script() -> str:
 
 
 def read_styles(theme: PageTheme) -> str:
+    return "\n\n".join(read_asset(name) for name in theme_spec(theme).styles)
+
+
+def theme_spec(theme: PageTheme) -> ThemeSpec:
     try:
-        spec = THEME_SPECS[theme]
+        return THEME_SPECS[theme]
     except KeyError as error:
         raise ValueError(f"Unsupported page theme: {theme}") from error
-    return "\n\n".join(read_asset(name) for name in spec.styles)
 
 
 def assemble_page(
@@ -82,6 +119,7 @@ def assemble_page(
     text: PageText,
     theme: PageTheme = PageTheme.NATIVE,
 ) -> str:
+    spec = theme_spec(theme)
     replacements = {
         "__STYLES__": read_styles(theme),
         "__SCRIPT__": read_script(),
@@ -90,6 +128,11 @@ def assemble_page(
         "__TITLE__": escape_html(text.chart.title),
         "__SUBTITLE__": escape_html(text.subtitle),
         "__FOOTNOTE__": escape_html(text.chart.footnote),
+        "__PANEL_CLASSES__": spec.class_for("panel"),
+        "__SEARCH_CLASSES__": spec.class_for("search"),
+        "__ACTION_CLASSES__": spec.class_for("actions"),
+        "__BUTTON_CLASSES__": spec.class_for("button"),
+        "__CHART_CLASSES__": spec.class_for("chart"),
     }
 
     html = read_asset("template.html")

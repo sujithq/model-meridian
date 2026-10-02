@@ -1,0 +1,90 @@
+  :root {
+    color-scheme: light;
+    --pico-font-size: 100%;
+    --pico-spacing: 1rem;
+  }
+  body { padding: 0; }
+  header h1 { margin: 0 0 6px; }
+  .subtitle { margin: 0; color: var(--pico-muted-color); }
+  .panel {
+    border: var(--pico-border-width) solid var(--pico-card-border-color);
+    border-radius: var(--pico-border-radius);
+    background: var(--pico-card-background-color);
+    box-shadow: var(--pico-card-box-shadow);
+  }
+  .panel h2 {
+    margin: 0 0 10px;
+    color: var(--pico-muted-color);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .field label {
+    margin-bottom: 6px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .field output { color: var(--pico-muted-color); font-weight: 400; }
+  .field .hint {
+    margin: 6px 0 0;
+    color: var(--pico-muted-color);
+    font-size: 0.71875rem;
+    font-weight: 400;
+  }
+  input[type="search"], input[type="number"] {
+    height: auto;
+    margin: 0;
+    font-size: 0.8125rem;
+  }
+  input[type="range"] { margin: 0; }
+  .checks {
+    border: var(--pico-border-width) solid var(--pico-form-element-border-color);
+    border-radius: var(--pico-border-radius);
+    background: var(--pico-form-element-background-color);
+  }
+  .checks label, .toggles label {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 400;
+  }
+  .checks input, .toggles input { margin: 0; }
+  .swatch { border-radius: calc(var(--pico-border-radius) / 2); }
+  .row button {
+    width: 100%;
+    margin: 0;
+    font-size: 0.8125rem;
+  }
+  .chart-wrap {
+    border: var(--pico-border-width) solid var(--pico-card-border-color);
+    border-radius: var(--pico-border-radius);
+    background: var(--pico-card-background-color);
+    box-shadow: var(--pico-card-box-shadow);
+  }
+  .status, footer, .empty {
+    color: var(--pico-muted-color);
+    font-size: 0.8125rem;
+  }
+  .axis-label { font-size: 15px; font-weight: 700; fill: var(--pico-color); }
+  .tick-label { font-size: 12px; fill: var(--pico-muted-color); }
+  .note {
+    font-size: 10px;
+    font-weight: 700;
+    fill: var(--pico-muted-color);
+    letter-spacing: 0.04em;
+  }
+  .family-label { font-size: 11.5px; font-weight: 700; }
+  .effort-label { font-size: 9.5px; fill: var(--pico-muted-color); }
+  .dot { cursor: pointer; }
+  .dot:hover { stroke: var(--pico-color); stroke-width: 2; }
+  #tooltip {
+    border-radius: var(--pico-border-radius);
+    padding: 9px 11px;
+    background: var(--pico-contrast-background);
+    box-shadow: var(--pico-box-shadow);
+    color: var(--pico-contrast-inverse);
+    font-size: 0.78125rem;
+    line-height: 1.5;
+  }
+  #tooltip .tip-title { font-weight: 700; }
+  #tooltip .tip-row { color: var(--pico-muted-border-color); }
+  #tooltip .tip-row b { color: var(--pico-contrast-inverse); font-weight: 600; }

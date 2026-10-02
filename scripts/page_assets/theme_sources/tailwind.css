@@ -1,0 +1,121 @@
+@import "tailwindcss" source(none);
+
+@theme {
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 font-sans text-slate-800 antialiased;
+  }
+}
+
+@layer components {
+  header h1 {
+    @apply mb-1.5 text-[26px] font-bold tracking-tight text-slate-900;
+  }
+
+  .subtitle {
+    @apply m-0 text-[15px] text-slate-500;
+  }
+
+  .panel {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .panel h2 {
+    @apply mb-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500;
+  }
+
+  .field label {
+    @apply mb-1.5 text-[13px] font-semibold text-slate-700;
+  }
+
+  .field output {
+    @apply font-normal text-slate-500;
+  }
+
+  .field .hint {
+    @apply mt-1.5 mb-0 text-[11.5px] font-normal text-slate-500;
+  }
+
+  input[type="search"], input[type="number"] {
+    @apply rounded-lg border border-slate-300 bg-white text-[13px] text-slate-800 shadow-xs outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100;
+  }
+
+  input[type="range"], input[type="checkbox"] {
+    @apply accent-sky-600;
+  }
+
+  .checks {
+    @apply rounded-lg border border-slate-200 bg-slate-50;
+  }
+
+  .checks label, .toggles label {
+    @apply m-0 text-[13px] font-normal text-slate-700;
+  }
+
+  .checks input, .toggles input {
+    @apply m-0;
+  }
+
+  .swatch {
+    @apply rounded-sm;
+  }
+
+  button {
+    @apply rounded-lg border border-slate-300 bg-white text-[13px] font-medium text-slate-700 shadow-xs transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-200;
+  }
+
+  .chart-wrap {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .status, footer, .empty {
+    @apply text-[13px] text-slate-500;
+  }
+
+  .axis-label {
+    @apply fill-slate-800 text-[15px] font-bold;
+  }
+
+  .tick-label {
+    @apply fill-slate-600 text-xs;
+  }
+
+  .note {
+    @apply fill-slate-500 text-[10px] font-bold tracking-wider;
+  }
+
+  .family-label {
+    @apply text-[11.5px] font-bold;
+  }
+
+  .effort-label {
+    @apply fill-slate-600 text-[9.5px];
+  }
+
+  .dot {
+    @apply cursor-pointer;
+  }
+
+  .dot:hover {
+    @apply stroke-slate-900 stroke-2;
+  }
+
+  #tooltip {
+    @apply rounded-lg bg-slate-900 px-[11px] py-[9px] text-[12.5px] leading-6 text-white shadow-xl;
+  }
+
+  #tooltip .tip-title {
+    @apply font-bold;
+  }
+
+  #tooltip .tip-row {
+    @apply text-slate-300;
+  }
+
+  #tooltip .tip-row b {
+    @apply font-semibold text-white;
+  }
+}

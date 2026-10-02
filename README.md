@@ -36,6 +36,13 @@ The interactive-page source is separated by responsibility while keeping
     structure.
   - `themes/native.css` contains the default visual theme. The typed theme
     registry keeps theme selection isolated from chart and filter behavior.
+  - `themes/pico.css` adapts the page to the locally embedded Pico CSS
+    framework.
+  - `themes/bulma.css` adapts Bulma components to the chart controls and SVG.
+  - `theme_sources/tailwind.css` is the Tailwind source adapter compiled by
+    `npm run build:themes`.
+  - `vendor/` contains pinned framework stylesheets and their MIT licenses;
+    generated pages never load them from a CDN.
   - `chart_math.js` contains formatting, tick, and collision helpers.
   - `filter_state.js` owns filter bounds, selections, matching, and faceting.
   - `chart_renderer.js` owns the responsive SVG, labels, and tooltip rendering.
@@ -72,12 +79,22 @@ an independent visualization and is not affiliated with the original source.
 - Python 3.10 or newer
 - Matplotlib (required for the PNG renderer only)
 - Playwright with Chromium (required for live CSV refreshes only)
+- Node.js with npm (required only when rebuilding the Tailwind theme artifact)
 
 Install the dependencies:
 
 ```powershell
 python -m pip install -r requirements.txt
 python -m playwright install --with-deps chromium
+```
+
+The compiled Tailwind asset is committed, so normal page generation does not
+require Node.js. After changing `theme_sources/tailwind.css` or its pinned
+dependencies, rebuild it with:
+
+```powershell
+npm ci
+npm run build:themes
 ```
 
 ## Testing
@@ -143,12 +160,27 @@ Select the visual theme explicitly:
 
 ```powershell
 python scripts\generate_page.py data\data.csv -o src\index.html --theme native
+python scripts\generate_page.py data\data.csv -o out\pico.html --theme pico
+python scripts\generate_page.py data\data.csv -o out\bulma.html --theme bulma
+python scripts\generate_page.py data\data.csv -o out\tailwind.html --theme tailwind
 ```
 
-`native` is currently the only available theme and remains the default. The
-theme seam keeps framework-independent layout and chart behavior separate from
-replaceable visual styling so additional themes can be evaluated without
-changing the page logic.
+Available themes:
+
+| Theme | Description |
+| --- | --- |
+| `native` | The original project-specific appearance and default output |
+| `pico` | Pico CSS 2.1.1 with a focused adapter for the filters, chart, and tooltip |
+| `bulma` | Bulma 1.0.4 components with a focused chart and control adapter |
+| `tailwind` | Tailwind CSS 4.3.3 compiled from the project-owned theme source |
+
+The theme seam keeps framework-independent layout and chart behavior separate
+from replaceable visual styling. Framework assets are pinned, stored locally,
+and embedded into the generated HTML, so every theme remains self-contained.
+All three evaluated frameworks are distributed under the MIT License:
+[Pico](scripts/page_assets/vendor/pico-2.1.1/LICENSE.md),
+[Bulma](scripts/page_assets/vendor/bulma-1.0.4/LICENSE), and
+[Tailwind CSS](scripts/page_assets/vendor/tailwind-4.3.3/LICENSE).
 
 ### GitHub Pages deployment
 

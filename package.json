@@ -1,0 +1,11 @@
+{
+  "name": "model-meridian",
+  "private": true,
+  "scripts": {
+    "build:themes": "tailwindcss -i ./scripts/page_assets/theme_sources/tailwind.css -o ./scripts/page_assets/vendor/tailwind-4.3.3/tailwind.min.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.3",
+    "tailwindcss": "4.3.3"
+  }
+}

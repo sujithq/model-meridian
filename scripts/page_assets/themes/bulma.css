@@ -1,0 +1,113 @@
+  html { background: var(--bulma-scheme-main); }
+  body {
+    padding: 0;
+    background: var(--bulma-scheme-main);
+    color: var(--bulma-text);
+    font-family: var(--bulma-family-primary);
+  }
+  header h1 {
+    margin: 0 0 6px;
+    color: var(--bulma-text-strong);
+    font-size: 1.625rem;
+    font-weight: var(--bulma-weight-bold);
+  }
+  .subtitle {
+    margin: 0;
+    color: var(--bulma-text-weak);
+    font-size: 0.9375rem;
+  }
+  .panel.box {
+    display: block;
+    margin: 0;
+    padding: 16px;
+    border: 1px solid var(--bulma-border-weak);
+    border-radius: var(--bulma-radius-large);
+    background: var(--bulma-scheme-main-bis);
+    box-shadow: var(--bulma-shadow);
+  }
+  .panel h2 {
+    margin: 0 0 10px;
+    color: var(--bulma-text-weak);
+    font-size: 0.75rem;
+    font-weight: var(--bulma-weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .field { margin-bottom: 16px; }
+  .field label {
+    margin-bottom: 6px;
+    color: var(--bulma-text);
+    font-size: 0.8125rem;
+    font-weight: var(--bulma-weight-semibold);
+  }
+  .field output { color: var(--bulma-text-weak); font-weight: 400; }
+  .field .hint {
+    margin: 6px 0 0;
+    color: var(--bulma-text-weak);
+    font-size: 0.71875rem;
+    font-weight: 400;
+  }
+  input.input[type="search"] {
+    height: auto;
+    margin: 0;
+    font-size: 0.8125rem;
+  }
+  input[type="range"] { margin: 0; }
+  .checks {
+    border: 1px solid var(--bulma-border-weak);
+    border-radius: var(--bulma-radius);
+    background: var(--bulma-scheme-main);
+  }
+  .checks label, .toggles label {
+    margin: 0;
+    color: var(--bulma-text);
+    font-size: 0.8125rem;
+    font-weight: 400;
+  }
+  .checks input, .toggles input { margin: 0; }
+  .swatch { border-radius: var(--bulma-radius-small); }
+  .row.buttons {
+    margin: 0;
+    gap: 8px;
+  }
+  .row.buttons .button {
+    width: 100%;
+    margin: 0;
+    font-size: 0.8125rem;
+  }
+  .chart-wrap.box {
+    margin: 0;
+    padding: 8px;
+    border: 1px solid var(--bulma-border-weak);
+    border-radius: var(--bulma-radius-large);
+    background: var(--bulma-scheme-main);
+    box-shadow: var(--bulma-shadow);
+  }
+  .status, footer, .empty {
+    color: var(--bulma-text-weak);
+    font-size: 0.8125rem;
+  }
+  .axis-label { font-size: 15px; font-weight: 700; fill: var(--bulma-text-strong); }
+  .tick-label { font-size: 12px; fill: var(--bulma-text); }
+  .note {
+    font-size: 10px;
+    font-weight: 700;
+    fill: var(--bulma-text-weak);
+    letter-spacing: 0.04em;
+  }
+  .family-label { font-size: 11.5px; font-weight: 700; }
+  .effort-label { font-size: 9.5px; fill: var(--bulma-text); }
+  .dot { cursor: pointer; }
+  .dot:hover { stroke: var(--bulma-text-strong); stroke-width: 2; }
+  #tooltip {
+    border-radius: var(--bulma-radius);
+    padding: 9px 11px;
+    background: var(--bulma-text-strong);
+    box-shadow: var(--bulma-shadow);
+    color: var(--bulma-scheme-main);
+    font-size: 0.78125rem;
+    line-height: 1.5;
+  }
+  #tooltip .tip-title { font-weight: 700; }
+  #tooltip .tip-row { color: var(--bulma-border); }
+  #tooltip .tip-row b { color: var(--bulma-scheme-main); font-weight: 600; }
