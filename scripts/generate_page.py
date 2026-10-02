@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 from chart_data import ChartText, DataFilters
-from page_builder import PageOptions, PageText, build_page
+from page_builder import PageOptions, PageText, PageTheme, build_page
 
 
 def parse_args(argv: list[str] | None = None) -> PageOptions:
@@ -46,6 +46,12 @@ def parse_args(argv: list[str] | None = None) -> PageOptions:
         "--families", nargs="+", help="Only include families whose name contains one of these substrings"
     )
     parser.add_argument("--top", type=int, help="Only include the N highest scoring families")
+    parser.add_argument(
+        "--theme",
+        choices=tuple(theme.value for theme in PageTheme),
+        default=PageTheme.NATIVE.value,
+        help="Page theme (default: native)",
+    )
     args = parser.parse_args(argv)
     return PageOptions(
         source=Path(args.csv),
@@ -65,6 +71,7 @@ def parse_args(argv: list[str] | None = None) -> PageOptions:
             ),
             subtitle=args.subtitle,
         ),
+        theme=PageTheme(args.theme),
     )
 
 

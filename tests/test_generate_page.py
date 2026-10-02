@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import subprocess
 import sys
 import tempfile
@@ -15,10 +16,14 @@ from chart_data import ChartText, DataFilters
 from generate_page import parse_args
 from page_builder import (
     SCRIPT_ASSETS,
+    THEME_SPECS,
     PageOptions,
     PageText,
+    PageTheme,
+    ThemeSpec,
     assemble_page,
     build_page,
+    read_styles,
 )
 from page_data import build_payload
 
@@ -137,6 +142,12 @@ class PagePayloadTests(unittest.TestCase):
         self.assertEqual(options.source, Path("models.csv"))
         self.assertEqual(options.filters.families, ("Alpha", "Beta"))
         self.assertEqual(options.filters.min_score, 42.0)
+        self.assertEqual(options.theme, PageTheme.NATIVE)
+
+    def test_parse_args_rejects_an_unknown_theme(self) -> None:
+        with mock.patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit):
+                parse_args(["models.csv", "--theme", "unknown"])
 
 
 class GeneratedPageTests(unittest.TestCase):
@@ -155,6 +166,8 @@ class GeneratedPageTests(unittest.TestCase):
         self.assertNotIn('<script src="', html)
         self.assertNotIn('<link rel="stylesheet"', html)
         self.assertNotIn("https://cdn.", html)
+        self.assertIn("* { box-sizing: border-box; }", html)
+        self.assertIn("--bg: #ffffff;", html)
 
     def test_page_replaces_all_placeholders_and_embeds_assets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -168,6 +181,30 @@ class GeneratedPageTests(unittest.TestCase):
         self.assertNotIn("__CONFIG__", html)
         self.assertIn(":root {", html)
         self.assertIn("function render()", html)
+
+    def test_native_theme_embeds_base_styles_before_theme_styles(self) -> None:
+        styles = read_styles(PageTheme.NATIVE)
+
+        self.assertLess(
+            styles.index("* { box-sizing: border-box; }"),
+            styles.index("--bg: #ffffff;"),
+        )
+        self.assertEqual(
+            THEME_SPECS[PageTheme.NATIVE],
+            ThemeSpec(styles=("base.css", "themes/native.css")),
+        )
+
+    def test_unsupported_theme_fails_explicitly(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unsupported page theme"):
+            read_styles("unknown")  # type: ignore[arg-type]
+
+    def test_missing_theme_asset_fails_explicitly(self) -> None:
+        with mock.patch.dict(
+            THEME_SPECS,
+            {PageTheme.NATIVE: ThemeSpec(styles=("base.css", "themes/missing.css"))},
+        ):
+            with self.assertRaisesRegex(RuntimeError, "themes.missing.css"):
+                read_styles(PageTheme.NATIVE)
 
     def test_page_embeds_javascript_modules_in_dependency_order(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -32,6 +32,10 @@ The interactive-page source is separated by responsibility while keeping
 - `scripts/page_assets/` contains the HTML template, CSS, and focused browser
   JavaScript modules for chart math, filter state, SVG rendering, and UI
   orchestration.
+  - `base.css` contains framework-independent layout, responsive, and chart
+    structure.
+  - `themes/native.css` contains the default visual theme. The typed theme
+    registry keeps theme selection isolated from chart and filter behavior.
   - `chart_math.js` contains formatting, tick, and collision helpers.
   - `filter_state.js` owns filter bounds, selections, matching, and faceting.
   - `chart_renderer.js` owns the responsive SVG, labels, and tooltip rendering.
@@ -134,6 +138,17 @@ python scripts/generate_page.py data\data.csv -o src\index.html
 By default the page is written next to the CSV with an `.html` extension. Open
 the file directly in a browser, or publish it as a static page — it embeds its
 data and has no external dependencies.
+
+Select the visual theme explicitly:
+
+```powershell
+python scripts\generate_page.py data\data.csv -o src\index.html --theme native
+```
+
+`native` is currently the only available theme and remains the default. The
+theme seam keeps framework-independent layout and chart behavior separate from
+replaceable visual styling so additional themes can be evaluated without
+changing the page logic.
 
 ### GitHub Pages deployment
 

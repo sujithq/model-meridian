@@ -40,3 +40,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Isolate the browser boundary behind a `ModelSource` protocol so export
   filtering, ordering, validation, and CSV writing no longer require a browser
   driver to import or test.
+- Separate framework-independent page structure from the native visual theme
+  and add typed `--theme` selection while preserving `native` as the default.

@@ -7,6 +7,7 @@
 - CLI parsing stays in the renderer entry points and translates arguments into focused configuration dataclasses; renderer internals must not depend on `argparse.Namespace`.
 - Interactive-page payload construction lives in `scripts/page_data.py`; document assembly and build-time asset loading live in `scripts/page_builder.py`.
 - Interactive-page HTML, CSS and browser JavaScript live in `scripts/page_assets/`; keep `chart_math.js`, `filter_state.js`, `chart_renderer.js`, and `app.js` focused on their named responsibility, resolve them relative to the scripts directory, and embed them in that dependency order.
+- Framework-independent page structure lives in `scripts/page_assets/base.css`; replaceable visual styling lives under `scripts/page_assets/themes/`. Register themes through the typed theme registry in `scripts/page_builder.py`, keep `native` as the default unless an intentional output change is approved, and never add a runtime CDN dependency.
 - `scripts/export_artificial_analysis_csv.py` is the deterministic data-refresh entry point used by automation; it only wires a source to the pipeline.
 - Export filtering, ordering, de-duplication, validation and CSV writing live in `scripts/export_pipeline.py` and must stay standard-library only so they are testable without a browser driver. Site selectors, the in-page extraction script, and the Playwright import stay in `scripts/export_source.py` behind the `ModelSource` protocol.
 - Keep CSV parsing tolerant of extra columns, but preserve the required `model`, `cost_per_task_usd`, `intelligence_index`, and `color` fields.
@@ -37,6 +38,7 @@ PNG and HTML output.
 | Shared parsing or series logic in `scripts/chart_data.py` | Both renderers, then re-verify PNG and HTML output |
 | Shared configuration dataclasses | Both renderers and their characterization tests |
 | Interactive page payload, assembly, or assets | `scripts/page_data.py`, `scripts/page_builder.py`, and `scripts/page_assets/`, then re-verify the self-contained HTML |
+| Page theme registry or theme assets | `scripts/generate_page.py`, `scripts/page_builder.py`, theme tests, and `README.md`, then compare desktop, mobile, and ultrawide output |
 | Data-export behavior in `scripts/export_pipeline.py` or `scripts/export_artificial_analysis_csv.py` | `README.md`, `requirements.txt`, and the export workflow |
 | Site selectors or the in-page extraction script in `scripts/export_source.py` | `scripts/export_pipeline.py` only if the `ModelSource` protocol changes |
 | GitHub Pages output path | `README.md`, `.gitignore`, and the deploy workflow |
