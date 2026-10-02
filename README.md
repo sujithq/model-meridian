@@ -78,7 +78,10 @@ The page supports:
 
 - **Hover details** — point at any marker for the model name, score, cost,
   family, reasoning effort, fallback flag, and source URL.
-- **Search** — match on model or family name.
+- **Synchronized filters** — search, score, cost, family, and reasoning effort
+  narrow the applicable choices and slider ranges in the other filter groups.
+  Broadening a filter restores wider choices without losing slider thresholds
+  explicitly chosen by the user.
 - **Score and cost sliders** — raise the minimum score or lower the maximum cost.
 - **Reasoning effort and family checkboxes** — toggle individual series.
 - **Display toggles** — connect efforts within a family, show family labels, and

@@ -11,6 +11,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CSV-driven intelligence-versus-cost chart generation.
 - Interactive self-contained HTML page with hover details and live filtering by
   search text, score, cost, reasoning effort and model family.
+- Synchronized family and reasoning-effort options that respond to search,
+  numeric bounds, and one another while preserving existing selections, plus
+  score and cost slider ranges that adapt to the active text and categories.
 - Shared `chart_data` module so the image and page renderers group, order and
   colour models identically.
 - Model-family and reasoning-effort parsing with collision-aware labels.

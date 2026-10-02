@@ -116,6 +116,7 @@ TEMPLATE = """<!DOCTYPE html>
     padding: 3px 0;
     cursor: pointer;
   }
+  .checks label[hidden] { display: none; }
   .swatch {
     width: 11px;
     height: 11px;
@@ -300,10 +301,15 @@ function el(name, attrs, text) {
   return node;
 }
 
-const scoreBounds = [CONFIG.minScore, CONFIG.maxScore];
+const fullScoreBounds = [CONFIG.minScore, CONFIG.maxScore];
+const fullCostBounds = [CONFIG.minCost, CONFIG.maxCost];
 const COST_STEPS = 1000;
-const costLo = Math.log10(CONFIG.minCost);
-const costHi = Math.log10(CONFIG.maxCost);
+let scoreBounds = fullScoreBounds.slice();
+let costBounds = fullCostBounds.slice();
+let costLo = Math.log10(costBounds[0]);
+let costHi = Math.log10(costBounds[1]);
+let requestedMinScore = Math.floor(fullScoreBounds[0]);
+let requestedMaxCost = Infinity;
 
 // The cost slider runs on a normalized integer scale mapped into log space, so
 // its top position lands exactly on the most expensive model.
@@ -311,16 +317,43 @@ function sliderToCost(step) {
   return Math.pow(10, costLo + ((costHi - costLo) * step) / COST_STEPS);
 }
 
-function setupRanges() {
+function costToSlider(cost) {
+  if (costHi === costLo) return COST_STEPS;
+  return Math.round(
+    ((Math.log10(cost) - costLo) / (costHi - costLo)) * COST_STEPS
+  );
+}
+
+function applyRangeControls() {
   els.minScore.min = Math.floor(scoreBounds[0]);
   els.minScore.max = Math.ceil(scoreBounds[1]);
   els.minScore.step = 0.5;
-  els.minScore.value = Math.floor(scoreBounds[0]);
+  els.minScore.value = Math.min(
+    parseFloat(els.minScore.max),
+    Math.max(parseFloat(els.minScore.min), requestedMinScore)
+  );
 
   els.maxCost.min = 0;
   els.maxCost.max = COST_STEPS;
   els.maxCost.step = 1;
-  els.maxCost.value = COST_STEPS;
+  const boundedCost = Math.min(
+    costBounds[1],
+    Math.max(costBounds[0], requestedMaxCost)
+  );
+  els.maxCost.value =
+    !Number.isFinite(requestedMaxCost) || requestedMaxCost >= costBounds[1]
+      ? COST_STEPS
+      : Math.max(0, Math.min(COST_STEPS, costToSlider(boundedCost)));
+}
+
+function setupRanges() {
+  scoreBounds = fullScoreBounds.slice();
+  costBounds = fullCostBounds.slice();
+  costLo = Math.log10(costBounds[0]);
+  costHi = Math.log10(costBounds[1]);
+  requestedMinScore = Math.floor(fullScoreBounds[0]);
+  requestedMaxCost = Infinity;
+  applyRangeControls();
 }
 
 function buildChecks(container, items, nameKey) {
@@ -365,16 +398,81 @@ function currentFilters() {
   };
 }
 
+function matchesSearch(point, query) {
+  if (!query) return true;
+  const haystack = (point.model + " " + point.family).toLowerCase();
+  return haystack.includes(query);
+}
+
 function matches(point, f) {
   if (point.score < f.minScore) return false;
   if (point.cost > f.maxCost) return false;
   if (!f.efforts.has(point.effort || "(none)")) return false;
   if (!f.families.has(point.family)) return false;
-  if (f.query) {
-    const haystack = (point.model + " " + point.family).toLowerCase();
-    if (!haystack.includes(f.query)) return false;
-  }
+  if (!matchesSearch(point, f.query)) return false;
   return true;
+}
+
+function matchesBoundsAndSearch(point, f) {
+  return point.score >= f.minScore
+    && point.cost <= f.maxCost
+    && matchesSearch(point, f.query);
+}
+
+function syncFilterOptions(f) {
+  const effortCandidates = DATA.filter((point) =>
+    matchesBoundsAndSearch(point, f)
+    && (!f.families.size || f.families.has(point.family))
+  );
+  const familyCandidates = DATA.filter((point) =>
+    matchesBoundsAndSearch(point, f)
+    && (!f.efforts.size || f.efforts.has(point.effort || "(none)"))
+  );
+  const availableEfforts = new Set(
+    effortCandidates.map((point) => point.effort || "(none)")
+  );
+  const availableFamilies = new Set(
+    familyCandidates.map((point) => point.family)
+  );
+
+  for (const [container, available] of [
+    [els.effortChecks, availableEfforts],
+    [els.familyChecks, availableFamilies],
+  ]) {
+    container.querySelectorAll("label").forEach((label) => {
+      const input = label.querySelector("input");
+      const isAvailable = available.has(input.value);
+      label.hidden = !isAvailable;
+      input.disabled = !isAvailable;
+    });
+  }
+}
+
+function syncSliderRanges(f) {
+  const candidates = DATA.filter((point) =>
+    matchesSearch(point, f.query)
+    && (!f.efforts.size || f.efforts.has(point.effort || "(none)"))
+    && (!f.families.size || f.families.has(point.family))
+  );
+  if (!candidates.length) return;
+
+  scoreBounds = [
+    Math.min(...candidates.map((point) => point.score)),
+    Math.max(
+      ...candidates.map((point) => point.score),
+      requestedMinScore
+    ),
+  ];
+  const candidateMinCost = Math.min(...candidates.map((point) => point.cost));
+  costBounds = [
+    Number.isFinite(requestedMaxCost)
+      ? Math.min(candidateMinCost, requestedMaxCost)
+      : candidateMinCost,
+    Math.max(...candidates.map((point) => point.cost)),
+  ];
+  costLo = Math.log10(costBounds[0]);
+  costHi = Math.log10(costBounds[1]);
+  applyRangeControls();
 }
 
 function costTicks(lo, hi) {
@@ -438,10 +536,13 @@ function hideTooltip() {
 }
 
 function render() {
-  const f = currentFilters();
+  let f = currentFilters();
+  syncSliderRanges(f);
+  f = currentFilters();
+  syncFilterOptions(f);
   els.minScoreOut.textContent = f.minScore.toFixed(1);
   els.maxCostOut.textContent = money(
-    Number.isFinite(f.maxCost) ? f.maxCost : CONFIG.maxCost
+    Number.isFinite(f.maxCost) ? f.maxCost : costBounds[1]
   );
 
   const visible = DATA.filter((p) => matches(p, f));
@@ -592,10 +693,10 @@ function render() {
   }
 }
 
-function setAllChecks(checked) {
+function selectAllChecks() {
   document
     .querySelectorAll('.checks input[type="checkbox"]')
-    .forEach((input) => { input.checked = checked; });
+    .forEach((input) => { input.checked = true; });
   render();
 }
 
@@ -605,7 +706,10 @@ function resetFilters() {
   els.showLines.checked = true;
   els.showFamilyLabels.checked = true;
   els.showEffortLabels.checked = false;
-  setAllChecks(true);
+  document
+    .querySelectorAll('.checks input[type="checkbox"]')
+    .forEach((input) => { input.checked = true; });
+  render();
 }
 
 buildChecks(
@@ -622,13 +726,20 @@ setupRanges();
 
 ["input", "change"].forEach((evt) => {
   els.search.addEventListener(evt, render);
-  els.minScore.addEventListener(evt, render);
-  els.maxCost.addEventListener(evt, render);
+  els.minScore.addEventListener(evt, () => {
+    requestedMinScore = parseFloat(els.minScore.value);
+    render();
+  });
+  els.maxCost.addEventListener(evt, () => {
+    const step = parseFloat(els.maxCost.value);
+    requestedMaxCost = step >= COST_STEPS ? Infinity : sliderToCost(step);
+    render();
+  });
 });
 els.showLines.addEventListener("change", render);
 els.showFamilyLabels.addEventListener("change", render);
 els.showEffortLabels.addEventListener("change", render);
-els.selectAll.addEventListener("click", () => setAllChecks(true));
+els.selectAll.addEventListener("click", selectAllChecks);
 els.reset.addEventListener("click", resetFilters);
 window.addEventListener("scroll", hideTooltip, { passive: true });
 
