@@ -1,2 +1,4 @@
 out/
-__pycache__/chart_data.cpython-311.pyc
+src/index.html
+__pycache__/
+*.py[cod]

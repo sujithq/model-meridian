@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Compile Python source
-        run: python -m py_compile chart_data.py generate_chart.py generate_page.py
+        run: python -m py_compile scripts/chart_data.py scripts/generate_chart.py scripts/generate_page.py scripts/export_artificial_analysis_csv.py
       - name: Render example outputs
         run: |
-          python generate_chart.py data/data.csv -o out/chart.png
-          python generate_page.py data/data.csv -o out/index.html
+          python scripts/generate_chart.py data/data.csv -o out/chart.png
+          python scripts/generate_page.py data/data.csv -o out/index.html

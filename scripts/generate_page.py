@@ -1,8 +1,8 @@
 """Generate a self-contained interactive HTML page from a CSV export.
 
 Usage:
-    python generate_page.py data/data.csv
-    python generate_page.py data/data.csv -o out/index.html --min-score 30
+    python scripts/generate_page.py data/data.csv
+    python scripts/generate_page.py data/data.csv -o src/index.html --min-score 30
 
 The page mirrors `generate_chart.py`: same CSV columns, same family and
 reasoning-effort parsing, same colours and ordering. It adds hover tooltips with

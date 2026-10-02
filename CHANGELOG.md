@@ -21,3 +21,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Model-family and reasoning-effort parsing with collision-aware labels.
 - Command-line filtering and output customization.
 - Repository guidance and contribution workflow files.
+- Daily data-refresh and GitHub Pages deployment automation.
+- Python entry points organized under `scripts/`.

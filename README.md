@@ -10,22 +10,29 @@ The chart uses a logarithmic cost axis, colors from the input data, and
 collision-aware labels. It is designed to produce charts similar to
 [`data/example-chart.png`](data/example-chart.png).
 
-Two renderers share the same data model in [`chart_data.py`](chart_data.py):
+The generators live under [`scripts/`](scripts/) and share the same data model in [`scripts/chart_data.py`](scripts/chart_data.py):
 
 | Script | Output | Use it for |
 | --- | --- | --- |
-| `generate_chart.py` | Static PNG image | Slides, documents, reports |
-| `generate_page.py` | Self-contained interactive HTML page | Exploring the data with hover details and live filtering |
+| `scripts/generate_chart.py` | Static PNG image | Slides, documents, reports |
+| `scripts/generate_page.py` | Self-contained interactive HTML page | Exploring the data with hover details and live filtering |
+
+GitHub automation is configured with two workflows in [`.github/workflows/`](.github/workflows/):
+
+- `data-export.yml` exports the latest Artificial Analysis chart data to `data/data.csv` on a daily schedule or on demand.
+- `deploy-pages.yml` builds `src/index.html` from the exported CSV and deploys it to GitHub Pages.
 
 ## Requirements
 
 - Python 3.10 or newer
 - Matplotlib (required for the PNG renderer only)
+- Playwright with Chromium (required for live CSV refreshes only)
 
-Install the dependency:
+Install the dependencies:
 
 ```powershell
 python -m pip install -r requirements.txt
+python -m playwright install --with-deps chromium
 ```
 
 ## Usage
@@ -35,7 +42,7 @@ python -m pip install -r requirements.txt
 Pass the input CSV file as the positional argument:
 
 ```powershell
-python generate_chart.py data\data.csv
+python scripts\generate_chart.py data\data.csv
 ```
 
 By default, the image is written next to the CSV with a `.png` extension. The
@@ -44,13 +51,13 @@ command above creates `data\data.png`.
 Choose a different output path:
 
 ```powershell
-python generate_chart.py data\data.csv -o out\chart.png
+python scripts\generate_chart.py data\data.csv -o out\chart.png
 ```
 
 Create a less crowded chart by filtering the data:
 
 ```powershell
-python generate_chart.py data\data.csv `
+python scripts\generate_chart.py data\data.csv `
   -o out\frontier.png `
   --min-score 33 `
   --max-cost 12
@@ -59,20 +66,37 @@ python generate_chart.py data\data.csv `
 Filter by one or more family-name substrings:
 
 ```powershell
-python generate_chart.py data\data.csv --families GPT Claude Gemini
+python scripts\generate_chart.py data\data.csv --families GPT Claude Gemini
 ```
 
-Run `python generate_chart.py --help` for all available options.
+Run `python scripts\generate_chart.py --help` for all available options.
 
 ### Interactive page
 
 ```powershell
-python generate_page.py data\data.csv -o out\index.html
+python scripts/generate_page.py data\data.csv -o src\index.html
 ```
 
 By default the page is written next to the CSV with an `.html` extension. Open
 the file directly in a browser, or publish it as a static page — it embeds its
 data and has no external dependencies.
+
+### GitHub Pages deployment
+
+The repository uses two chained, non-agentic workflows for a daily refresh and
+deployment flow:
+
+```powershell
+python scripts/export_artificial_analysis_csv.py --output-dir data
+python scripts/generate_page.py data\data.csv -o src\index.html
+```
+
+`data-export.yml` runs daily at 02:00 UTC (and on demand), validates the live
+export, replaces `data/data.csv`, and commits it only when data changed.
+`deploy-pages.yml` runs after a successful export, generates `src/index.html`,
+uploads `src/` as the Pages artifact, and deploys it. It can also be started
+manually to publish the currently committed CSV. This deterministic script flow
+does not require the custom Copilot agent at runtime.
 
 The page supports:
 

@@ -1,8 +1,8 @@
 """Generate an "Intelligence Index vs. Cost per task" chart from a CSV export.
 
 Usage:
-    python generate_chart.py data/data.csv
-    python generate_chart.py data/data.csv -o my-chart.png --min-score 30
+    python scripts/generate_chart.py data/data.csv
+    python scripts/generate_chart.py data/data.csv -o my-chart.png --min-score 30
 
 The CSV is expected to have (at least) the columns:
     model, cost_per_task_usd, intelligence_index, color

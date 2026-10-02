@@ -9,9 +9,9 @@
 ## How to test
 
 ```powershell
-python -m py_compile chart_data.py generate_chart.py generate_page.py
-python generate_chart.py data\data.csv -o out\chart.png
-python generate_page.py data\data.csv -o out\index.html
+python -m py_compile scripts\chart_data.py scripts\generate_chart.py scripts\generate_page.py scripts\export_artificial_analysis_csv.py
+python scripts\generate_chart.py data\data.csv -o out\chart.png
+python scripts\generate_page.py data\data.csv -o src\index.html
 ```
 
 ## Checklist
