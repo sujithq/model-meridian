@@ -1,10 +1,11 @@
-# Artificial Analysis chart generator
+# Model Meridian
 
 [![AI Ready](https://img.shields.io/badge/AI--Ready-yes-brightgreen?style=flat)](https://github.com/johnpapa/ai-ready)
 
-Generate a labelled model intelligence-versus-cost chart from a CSV file. Models
-in the same family are connected across reasoning-effort levels, while models
-with only one data point are shown as diamonds.
+Model Meridian is an interactive AI model intelligence-and-cost explorer. It
+also generates labelled static charts from the same CSV data. Models in the
+same family are connected across reasoning-effort levels, while models with
+only one data point are shown as diamonds.
 
 The chart uses a logarithmic cost axis, colors from the input data, and
 collision-aware labels. It is designed to produce charts similar to
@@ -19,8 +20,14 @@ The generators live under [`scripts/`](scripts/) and share the same data model i
 
 GitHub automation is configured with two workflows in [`.github/workflows/`](.github/workflows/):
 
-- `data-export.yml` exports the latest Artificial Analysis chart data to `data/data.csv` on a daily schedule or on demand.
+- `data-export.yml` refreshes the original source data in `data/data.csv` on a daily schedule or on demand.
 - `deploy-pages.yml` builds `src/index.html` from the exported CSV and deploys it to GitHub Pages.
+
+## Data source
+
+Model and benchmark data originates from
+[Artificial Analysis](https://artificialanalysis.ai/models). Model Meridian is
+an independent visualization and is not affiliated with the original source.
 
 ## Requirements
 

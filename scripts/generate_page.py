@@ -1,4 +1,4 @@
-"""Generate a self-contained interactive HTML page from a CSV export.
+"""Generate a self-contained Model Meridian page from a CSV export.
 
 Usage:
     python scripts/generate_page.py data/data.csv
@@ -888,16 +888,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("csv", help="Path to the CSV file with the model data")
     parser.add_argument("-o", "--output", help="Output HTML path (default: <csv>.html)")
-    parser.add_argument("--title", default="Artificial Analysis Intelligence Index")
+    parser.add_argument("--title", default="Model Meridian")
     parser.add_argument(
         "--subtitle",
         default="Hover a data point for the full record. Use the filters to narrow the view.",
     )
     parser.add_argument("--xlabel", default="Cost per benchmark task (USD)")
-    parser.add_argument("--ylabel", default="Artificial Analysis Intelligence Score")
+    parser.add_argument("--ylabel", default="Intelligence Index Score")
     parser.add_argument(
         "--footnote",
-        default="Courtesy of Artificial Analysis · Scores and task costs from the source dataset.",
+        default="Data source: Artificial Analysis · Scores and task costs from the source dataset.",
     )
     parser.add_argument("--min-score", type=float, help="Only include models at or above this score")
     parser.add_argument("--max-cost", type=float, help="Only include models at or below this cost")

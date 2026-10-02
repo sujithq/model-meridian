@@ -1,4 +1,4 @@
-name: Export Artificial Analysis data
+name: Refresh source data
 
 on:
   schedule:
@@ -27,7 +27,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m playwright install --with-deps chromium
 
-      - name: Export chart data to CSV
+      - name: Export source chart data to CSV
         shell: bash
         run: |
           python scripts/export_artificial_analysis_csv.py --output-dir data
@@ -40,5 +40,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/data.csv
-          git diff --cached --quiet || git commit -m "chore(data): refresh Artificial Analysis export"
+          git diff --cached --quiet || git commit -m "chore(data): refresh source export"
           git push

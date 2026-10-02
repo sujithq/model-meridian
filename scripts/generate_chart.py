@@ -1,4 +1,4 @@
-"""Generate an "Intelligence Index vs. Cost per task" chart from a CSV export.
+"""Generate a Model Meridian intelligence-versus-cost chart from a CSV export.
 
 Usage:
     python scripts/generate_chart.py data/data.csv
@@ -248,10 +248,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("csv", help="Path to the CSV file with the model data")
     parser.add_argument("-o", "--output", help="Output image path (default: <csv>.png)")
-    parser.add_argument("--title", default="Artificial Analysis Intelligence Index")
+    parser.add_argument("--title", default="Model Meridian")
     parser.add_argument("--xlabel", default="Cost per benchmark task (USD)")
-    parser.add_argument("--ylabel", default="Artificial Analysis Intelligence Score")
-    parser.add_argument("--footnote", default="Courtesy of Artificial Analysis · Scores and task costs from the source dataset.")
+    parser.add_argument("--ylabel", default="Intelligence Index Score")
+    parser.add_argument(
+        "--footnote",
+        default="Data source: Artificial Analysis · Scores and task costs from the source dataset.",
+    )
     parser.add_argument("--min-score", type=float, help="Only plot models at or above this intelligence index")
     parser.add_argument("--max-cost", type=float, help="Only plot models at or below this cost per task")
     parser.add_argument("--families", nargs="+", help="Only plot families whose name contains one of these substrings")
