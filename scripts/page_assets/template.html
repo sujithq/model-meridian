@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+__STYLES__
+</style>
+</head>
+<body>
+<header>
+  <h1>__TITLE__</h1>
+  <p class="subtitle">__SUBTITLE__</p>
+</header>
+
+<div class="layout">
+  <aside class="panel">
+    <h2>Filters</h2>
+
+    <div class="field">
+      <label for="search">Search models or families</label>
+      <input type="search" id="search" placeholder="e.g. opus, gpt-6, gemini" autocomplete="off">
+      <p class="hint">Separate multiple terms with commas to combine them.</p>
+    </div>
+
+    <div class="field">
+      <label for="minScore">Minimum score <output id="minScoreOut"></output></label>
+      <input type="range" id="minScore">
+    </div>
+
+    <div class="field">
+      <label for="maxCost">Maximum cost per task <output id="maxCostOut"></output></label>
+      <input type="range" id="maxCost">
+    </div>
+
+    <div class="field">
+      <label>Reasoning effort</label>
+      <div class="checks" id="effortChecks"></div>
+    </div>
+
+    <div class="field">
+      <label>Model family</label>
+      <div class="checks" id="familyChecks"></div>
+    </div>
+
+    <div class="field toggles">
+      <label><input type="checkbox" id="showLines" checked> Connect efforts within a family</label>
+      <label><input type="checkbox" id="showFamilyLabels" checked> Show family labels</label>
+      <label><input type="checkbox" id="showEffortLabels"> Show effort labels</label>
+    </div>
+
+    <div class="row">
+      <button type="button" id="selectAll">Select all</button>
+      <button type="button" id="reset">Reset</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="chart-wrap">
+      <svg id="chart" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" role="img"
+           aria-label="Intelligence score versus cost per task"></svg>
+      <div class="empty" id="empty" hidden>No models match the current filters.</div>
+    </div>
+    <p class="status" id="status"></p>
+  </main>
+</div>
+
+<footer>__FOOTNOTE__</footer>
+<div id="tooltip" role="tooltip"></div>
+
+<script>
+const DATA = __DATA__;
+const CONFIG = __CONFIG__;
+__SCRIPT__
+</script>
+</body>
+</html>

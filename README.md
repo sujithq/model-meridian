@@ -21,6 +21,17 @@ The generators live under [`scripts/`](scripts/) and share the same data model i
 Each renderer loads the CSV once into shared typed model records containing the
 parsed family, effort, score, cost, source color, and optional model URL.
 
+The interactive-page source is separated by responsibility while keeping
+`generate_page.py` as the stable CLI entry point:
+
+- `scripts/page_data.py` builds the serialized chart payload and configuration.
+- `scripts/page_builder.py` loads and embeds the page assets.
+- `scripts/page_assets/` contains the HTML template, CSS, and browser JavaScript.
+
+These build-time assets are resolved relative to the scripts directory and are
+inlined into the generated HTML, so the published page remains a single
+self-contained file.
+
 GitHub automation is configured with two workflows in [`.github/workflows/`](.github/workflows/):
 
 - `data-export.yml` refreshes the original source data in `data/data.csv` on a daily schedule or on demand.

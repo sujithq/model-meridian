@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import argparse
 import csv
+import subprocess
+import sys
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
+from unittest import mock
 
 from tests.helpers import FIELDNAMES, write_fixture_csv
 
-from generate_page import build_page, build_payload
+import page_builder
+from page_builder import assemble_page, build_page
+from page_data import build_payload
 
 
 def page_args(source: Path, output: Path | None = None) -> argparse.Namespace:
@@ -120,6 +124,45 @@ class GeneratedPageTests(unittest.TestCase):
         self.assertNotIn('<script src="', html)
         self.assertNotIn('<link rel="stylesheet"', html)
         self.assertNotIn("https://cdn.", html)
+
+    def test_page_replaces_all_placeholders_and_embeds_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            html = assemble_page(page_args(source))
+
+        self.assertNotIn("__STYLES__", html)
+        self.assertNotIn("__SCRIPT__", html)
+        self.assertNotIn("__DATA__", html)
+        self.assertNotIn("__CONFIG__", html)
+        self.assertIn(":root {", html)
+        self.assertIn("function render()", html)
+
+    def test_missing_asset_fails_explicitly(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = write_fixture_csv(root / "models.csv")
+            with mock.patch.object(page_builder, "ASSET_DIR", root / "missing"):
+                with self.assertRaisesRegex(RuntimeError, "Unable to read page asset"):
+                    assemble_page(page_args(source))
+
+    def test_cli_resolves_assets_outside_repository_working_directory(self) -> None:
+        repository = Path(__file__).resolve().parents[1]
+        script = repository / "scripts" / "generate_page.py"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = write_fixture_csv(root / "models.csv")
+            output = root / "index.html"
+            result = subprocess.run(
+                [sys.executable, str(script), str(source), "-o", str(output)],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(output.is_file())
+            self.assertIn("const DATA =", output.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
