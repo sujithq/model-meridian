@@ -188,21 +188,24 @@ All three evaluated frameworks are distributed under the MIT License:
 
 Dependabot explicitly uses automatic rebasing for pip, npm, and GitHub Actions
 updates. The `dependabot-sequential-merge.yml` workflow selects only the oldest
-open non-draft Dependabot pull request, asks Dependabot to rebase it, and enables
-squash auto-merge. After that pull request closes, the next oldest pull request
-is activated. An hourly schedule recovers the process if an event is missed.
+open non-draft Dependabot pull request, asks Dependabot to rebase it, and merges
+it with squash after it is clean. After that pull request closes, the next oldest
+pull request is activated. An hourly schedule recovers the process if an event is
+missed.
 
-The workflow is disabled by default. Before enabling it:
+Before relying on the workflow, configure the repository once:
 
 1. Protect `main` and require the `CI / validate` check to pass.
 2. Require pull request branches to be up to date before merging.
-3. Enable pull request auto-merge in the repository settings.
-4. Create the repository Actions variable `DEPENDABOT_SEQUENTIAL_MERGE` with the
-   value `true`.
+3. Enable pull request auto-merge.
+4. Allow the workflow token to merge pull requests under the repository's branch
+   protection policy.
 
-If reviews are required, approve the Dependabot pull requests first; auto-merge
-waits for the approval and required checks. Set the variable to `false` to pause
-the queue without editing the workflow.
+The workflow is active for manual dispatches, Dependabot pull request events, and
+its hourly recovery schedule. It asks Dependabot to rebase the oldest pull request,
+waits for it to become clean, and then merges it directly with squash. If reviews
+are required, approve the Dependabot pull requests first. To pause the queue,
+disable the workflow temporarily or remove its write permissions.
 
 ### GitHub Pages deployment
 

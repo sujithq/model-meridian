@@ -17,7 +17,6 @@ concurrency:
 
 jobs:
   activate-oldest:
-    if: vars.DEPENDABOT_SEQUENTIAL_MERGE == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Find oldest open Dependabot pull request
@@ -31,6 +30,11 @@ jobs:
             --author app/dependabot \
             --json number,createdAt,isDraft \
             --jq 'sort_by(.createdAt) | map(select(.isDraft == false)) | .[0].number // empty')
+          if [ -z "$number" ]; then
+            echo "No open non-draft Dependabot pull requests found."
+          else
+            echo "Selected oldest Dependabot pull request: #$number"
+          fi
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
       - name: Request a fresh Dependabot rebase
@@ -57,4 +61,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ steps.oldest.outputs.number }}
-        run: gh pr merge "$PR_NUMBER" --auto --squash
+        run: gh pr merge "$PR_NUMBER" --auto --squash --delete-branch
