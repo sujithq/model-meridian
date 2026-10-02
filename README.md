@@ -112,6 +112,15 @@ color assignment, interactive-page payload and self-contained output, static
 PNG generation, export sorting and CSV validation, and the export pipeline
 driven by an in-memory stand-in for the browser source.
 
+## Contributing and security
+
+See [CONTRIBUTION.md](CONTRIBUTION.md) for development setup, project
+boundaries, validation, and pull request guidance. Participation is governed by
+the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Do not report suspected vulnerabilities in a public issue. Follow the private
+reporting guidance in [SECURITY.md](SECURITY.md).
+
 ## Usage
 
 ### Static chart
