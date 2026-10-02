@@ -10,18 +10,27 @@ The chart uses a logarithmic cost axis, colors from the input data, and
 collision-aware labels. It is designed to produce charts similar to
 [`data/example-chart.png`](data/example-chart.png).
 
+Two renderers share the same data model in [`chart_data.py`](chart_data.py):
+
+| Script | Output | Use it for |
+| --- | --- | --- |
+| `generate_chart.py` | Static PNG image | Slides, documents, reports |
+| `generate_page.py` | Self-contained interactive HTML page | Exploring the data with hover details and live filtering |
+
 ## Requirements
 
 - Python 3.10 or newer
-- Matplotlib
+- Matplotlib (required for the PNG renderer only)
 
 Install the dependency:
 
 ```powershell
-python -m pip install matplotlib
+python -m pip install -r requirements.txt
 ```
 
 ## Usage
+
+### Static chart
 
 Pass the input CSV file as the positional argument:
 
@@ -55,6 +64,29 @@ python generate_chart.py data\data.csv --families GPT Claude Gemini
 
 Run `python generate_chart.py --help` for all available options.
 
+### Interactive page
+
+```powershell
+python generate_page.py data\data.csv -o out\index.html
+```
+
+By default the page is written next to the CSV with an `.html` extension. Open
+the file directly in a browser, or publish it as a static page — it embeds its
+data and has no external dependencies.
+
+The page supports:
+
+- **Hover details** — point at any marker for the model name, score, cost,
+  family, reasoning effort, fallback flag, and source URL.
+- **Search** — match on model or family name.
+- **Score and cost sliders** — raise the minimum score or lower the maximum cost.
+- **Reasoning effort and family checkboxes** — toggle individual series.
+- **Display toggles** — connect efforts within a family, show family labels, and
+  show per-point effort labels.
+
+`generate_page.py` accepts the same `--min-score`, `--max-cost`, `--families`,
+and `--top` flags to bake a starting subset into the page.
+
 ## CSV format
 
 The CSV must contain these columns:
@@ -66,7 +98,8 @@ The CSV must contain these columns:
 | `intelligence_index` | Numeric intelligence score |
 | `color` | Model vendor or family color as a hex value |
 
-Additional columns are allowed and ignored by the chart generator.
+An optional `model_url` column is shown in the interactive page's hover details.
+Additional columns are allowed and ignored by both generators.
 
 Example:
 
@@ -103,18 +136,31 @@ The phrase `with fallback` is displayed as a separate fallback annotation.
 
 ## Options
 
+Shared by both generators:
+
 | Option | Purpose |
 | --- | --- |
-| `-o`, `--output` | Set the output image path |
+| `-o`, `--output` | Set the output file path |
 | `--min-score` | Include scores at or above the given value |
 | `--max-cost` | Include costs at or below the given value |
 | `--families` | Include families matching one or more substrings |
 | `--top` | Include only the highest-scoring N families |
-| `--no-effort-labels` | Hide labels attached to individual effort points |
 | `--title` | Set the chart title |
 | `--xlabel`, `--ylabel` | Set axis labels |
 | `--footnote` | Set the chart footnote |
+
+`generate_chart.py` only:
+
+| Option | Purpose |
+| --- | --- |
+| `--no-effort-labels` | Hide labels attached to individual effort points |
 | `--width`, `--height` | Set figure dimensions in inches |
 | `--dpi` | Set output resolution |
 | `--family-fontsize` | Set family-label font size |
 | `--effort-fontsize` | Set effort-label font size |
+
+`generate_page.py` only:
+
+| Option | Purpose |
+| --- | --- |
+| `--subtitle` | Set the text shown under the page title |
