@@ -42,6 +42,18 @@ python -m pip install -r requirements.txt
 python -m playwright install --with-deps chromium
 ```
 
+## Testing
+
+Run the standard-library characterization suite:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+The tests cover model parsing, CSV loading and filtering, series ordering and
+color assignment, interactive-page payload and self-contained output, static
+PNG generation, and export sorting and CSV validation.
+
 ## Usage
 
 ### Static chart

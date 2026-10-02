@@ -16,11 +16,14 @@
 ```powershell
 python -m pip install -r requirements.txt
 python -m py_compile scripts\chart_data.py scripts\generate_chart.py scripts\generate_page.py scripts\export_artificial_analysis_csv.py
+python -m unittest discover -s tests -v
 python scripts\generate_chart.py data\data.csv -o out\chart.png
 python scripts\generate_page.py data\data.csv -o src\index.html
 ```
 
-The repository currently has no automated test suite. For chart behavior changes, run the example commands and inspect the generated PNG and HTML output.
+The repository uses standard-library `unittest` characterization tests. For
+chart behavior changes, also run the example commands and inspect the generated
+PNG and HTML output.
 
 ## Maintenance matrix
 
@@ -36,6 +39,7 @@ The repository currently has no automated test suite. For chart behavior changes
 ## Done means
 
 - `python -m py_compile scripts\chart_data.py scripts\generate_chart.py scripts\generate_page.py scripts\export_artificial_analysis_csv.py` exits successfully.
+- `python -m unittest discover -s tests -v` passes.
 - The documented example commands generate a readable PNG and a working HTML page from `data\data.csv`.
 - Interactive page changes were verified in a browser, including hover details and each filter control.
 - `README.md` and `requirements.txt` reflect any changed interface or dependency.

@@ -10,6 +10,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Model Meridian product branding for the interactive page and static chart.
 - Responsive, non-distorting chart sizing for ultrawide screens.
+- Characterization tests for shared chart data, both renderers, and CSV export
+  transformations and validation.
 - CSV-driven intelligence-versus-cost chart generation.
 - Interactive self-contained HTML page with hover details and live filtering by
   search text, score, cost, reasoning effort and model family.
