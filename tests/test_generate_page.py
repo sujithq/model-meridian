@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import csv
 import subprocess
 import sys
@@ -12,52 +11,69 @@ from unittest import mock
 from tests.helpers import FIELDNAMES, write_fixture_csv
 
 import page_builder
-from page_builder import assemble_page, build_page
+from chart_data import ChartText, DataFilters
+from generate_page import parse_args
+from page_builder import (
+    SCRIPT_ASSETS,
+    PageOptions,
+    PageText,
+    assemble_page,
+    build_page,
+)
 from page_data import build_payload
 
 
-def page_args(source: Path, output: Path | None = None) -> argparse.Namespace:
-    return argparse.Namespace(
-        csv=str(source),
-        output=str(output) if output else None,
-        title="Model <Meridian>",
-        subtitle="Interactive comparison",
-        xlabel="Cost",
-        ylabel="Score",
-        footnote="Source attribution",
-        min_score=None,
-        max_cost=None,
-        families=None,
-        top=None,
+def page_options(source: Path, output: Path | None = None) -> PageOptions:
+    return PageOptions(
+        source=source,
+        output=output,
+        filters=DataFilters(),
+        text=PageText(
+            chart=ChartText(
+                title="Model <Meridian>",
+                xlabel="Cost",
+                ylabel="Score",
+                footnote="Source attribution",
+            ),
+            subtitle="Interactive comparison",
+        ),
     )
+
+
+def payload_for(options: PageOptions):
+    return build_payload(options.source, options.filters, options.text.chart)
 
 
 class PagePayloadTests(unittest.TestCase):
     def test_payload_preserves_urls_efforts_and_bounds(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = write_fixture_csv(Path(directory) / "models.csv")
-            records, config = build_payload(page_args(source))
+            payload = payload_for(page_options(source))
 
-        self.assertEqual(len(records), 3)
-        alpha_low = next(record for record in records if record["model"].endswith("fallback)"))
+        self.assertEqual(len(payload.records), 3)
+        alpha_low = next(
+            record for record in payload.records if str(record["model"]).endswith("fallback)")
+        )
         self.assertEqual(alpha_low["family"], "Alpha 1")
         self.assertEqual(alpha_low["effort"], "low")
         self.assertTrue(alpha_low["fallback"])
         self.assertEqual(alpha_low["url"], "https://example.test/alpha-low")
-        self.assertEqual(config["minScore"], 40.0)
-        self.assertEqual(config["maxScore"], 50.0)
-        self.assertEqual(config["minCost"], 0.5)
-        self.assertEqual(config["maxCost"], 2.0)
+        self.assertEqual(payload.config["minScore"], 40.0)
+        self.assertEqual(payload.config["maxScore"], 50.0)
+        self.assertEqual(payload.config["minCost"], 0.5)
+        self.assertEqual(payload.config["maxCost"], 2.0)
 
     def test_payload_applies_starting_filters(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = write_fixture_csv(Path(directory) / "models.csv")
-            args = page_args(source)
-            args.min_score = 44
-            args.families = ["beta"]
-            records, _ = build_payload(args)
+            options = page_options(source)
+            payload = build_payload(
+                options.source,
+                DataFilters(min_score=44, families=("beta",)),
+                options.text.chart,
+            )
 
-        self.assertEqual([record["model"] for record in records], ["Beta"])
+        self.assertEqual([record["model"] for record in payload.records], ["Beta"])
 
     def test_duplicate_labels_keep_row_specific_urls(self) -> None:
         rows = [
@@ -84,10 +100,10 @@ class PagePayloadTests(unittest.TestCase):
                 writer = csv.DictWriter(handle, fieldnames=FIELDNAMES)
                 writer.writeheader()
                 writer.writerows(rows)
-            records, _ = build_payload(page_args(source))
+            payload = payload_for(page_options(source))
 
         self.assertEqual(
-            {(record["cost"], record["url"]) for record in records},
+            {(record["cost"], record["url"]) for record in payload.records},
             {(1.0, "https://example.test/a"), (2.0, "https://example.test/b")},
         )
 
@@ -103,9 +119,24 @@ class PagePayloadTests(unittest.TestCase):
                 return original_open(path, *args, **kwargs)
 
             with mock.patch.object(Path, "open", tracked_open):
-                build_payload(page_args(source))
+                payload_for(page_options(source))
 
         self.assertEqual(opened_sources, [source])
+
+    def test_parse_args_translates_cli_values_to_typed_options(self) -> None:
+        options = parse_args([
+            "models.csv",
+            "--families",
+            "Alpha",
+            "Beta",
+            "--min-score",
+            "42",
+        ])
+
+        self.assertIsInstance(options, PageOptions)
+        self.assertEqual(options.source, Path("models.csv"))
+        self.assertEqual(options.filters.families, ("Alpha", "Beta"))
+        self.assertEqual(options.filters.min_score, 42.0)
 
 
 class GeneratedPageTests(unittest.TestCase):
@@ -114,7 +145,7 @@ class GeneratedPageTests(unittest.TestCase):
             root = Path(directory)
             source = write_fixture_csv(root / "models.csv")
             output = root / "index.html"
-            result = build_page(page_args(source, output))
+            result = build_page(page_options(source, output))
             html = result.read_text(encoding="utf-8")
 
         self.assertEqual(result, output)
@@ -128,7 +159,8 @@ class GeneratedPageTests(unittest.TestCase):
     def test_page_replaces_all_placeholders_and_embeds_assets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = write_fixture_csv(Path(directory) / "models.csv")
-            html = assemble_page(page_args(source))
+            options = page_options(source)
+            html = assemble_page(payload_for(options), options.text)
 
         self.assertNotIn("__STYLES__", html)
         self.assertNotIn("__SCRIPT__", html)
@@ -137,13 +169,42 @@ class GeneratedPageTests(unittest.TestCase):
         self.assertIn(":root {", html)
         self.assertIn("function render()", html)
 
+    def test_page_embeds_javascript_modules_in_dependency_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            options = page_options(source)
+            html = assemble_page(payload_for(options), options.text)
+
+        module_markers = (
+            "function money(",
+            "function currentFilters(",
+            "const svg = document.getElementById",
+            "function render(",
+            "const els =",
+        )
+        positions = [html.index(marker) for marker in module_markers]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(
+            SCRIPT_ASSETS,
+            ("chart_math.js", "filter_state.js", "chart_renderer.js", "app.js"),
+        )
+
+    def test_missing_javascript_module_fails_explicitly(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            options = page_options(source)
+            with mock.patch.object(page_builder, "SCRIPT_ASSETS", ("missing.js",)):
+                with self.assertRaisesRegex(RuntimeError, "missing.js"):
+                    assemble_page(payload_for(options), options.text)
+
     def test_missing_asset_fails_explicitly(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = write_fixture_csv(root / "models.csv")
+            options = page_options(source)
             with mock.patch.object(page_builder, "ASSET_DIR", root / "missing"):
                 with self.assertRaisesRegex(RuntimeError, "Unable to read page asset"):
-                    assemble_page(page_args(source))
+                    assemble_page(payload_for(options), options.text)
 
     def test_cli_resolves_assets_outside_repository_working_directory(self) -> None:
         repository = Path(__file__).resolve().parents[1]

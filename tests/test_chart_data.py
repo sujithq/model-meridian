@@ -7,6 +7,7 @@ from pathlib import Path
 from tests.helpers import write_fixture_csv
 
 from chart_data import (
+    DataFilters,
     DEFAULT_COLOR,
     ModelRecord,
     build_series,
@@ -84,9 +85,11 @@ class SeriesAndFilterTests(unittest.TestCase):
     def test_filter_combines_score_cost_and_family(self) -> None:
         filtered = filter_records(
             self.records,
-            min_score=40,
-            max_cost=1.5,
-            families=["alp", "beta"],
+            DataFilters(
+                min_score=40,
+                max_cost=1.5,
+                families=("alp", "beta"),
+            ),
         )
 
         self.assertEqual([point.model for point in filtered], ["Alpha (low)", "Beta"])

@@ -46,6 +46,22 @@ class ModelRecord:
     model_url: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class DataFilters:
+    min_score: float | None = None
+    max_cost: float | None = None
+    families: tuple[str, ...] = ()
+    top: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChartText:
+    title: str
+    xlabel: str
+    ylabel: str
+    footnote: str
+
+
 @dataclass
 class Series:
     family: str
@@ -172,16 +188,14 @@ def build_series(records: list[ModelRecord]) -> list[Series]:
 
 def filter_records(
     records: list[ModelRecord],
-    min_score: float | None = None,
-    max_cost: float | None = None,
-    families: list[str] | None = None,
+    filters: DataFilters,
 ) -> list[ModelRecord]:
-    if min_score is not None:
-        records = [record for record in records if record.score >= min_score]
-    if max_cost is not None:
-        records = [record for record in records if record.cost <= max_cost]
-    if families:
-        wanted = [f.lower() for f in families]
+    if filters.min_score is not None:
+        records = [record for record in records if record.score >= filters.min_score]
+    if filters.max_cost is not None:
+        records = [record for record in records if record.cost <= filters.max_cost]
+    if filters.families:
+        wanted = [family.lower() for family in filters.families]
         records = [
             record
             for record in records

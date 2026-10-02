@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib
@@ -30,12 +31,33 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, NullFormatter
 
 from chart_data import (
+    ChartText,
+    DataFilters,
     build_series,
     cost_ticks,
     filter_records,
     money,
     read_model_records,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class FigureOptions:
+    width: float = 16.0
+    height: float = 9.0
+    dpi: int = 140
+    family_fontsize: float = 9.5
+    effort_fontsize: float = 7.5
+    show_effort_labels: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class ChartOptions:
+    source: Path
+    output: Path | None
+    filters: DataFilters
+    text: ChartText
+    figure: FigureOptions
 
 
 def overlaps(a, b, pad: float = 1.0) -> bool:
@@ -104,22 +126,24 @@ def place_labels(fig, ax, labels, obstacles=None) -> None:
         occupied.append(bbox)
 
 
-def build_chart(args: argparse.Namespace) -> Path:
-    source = Path(args.csv)
-    records = read_model_records(source)
+def build_chart(options: ChartOptions) -> Path:
+    records = read_model_records(options.source)
     if not records:
-        raise SystemExit(f"No usable rows found in {source}")
+        raise SystemExit(f"No usable rows found in {options.source}")
 
-    records = filter_records(records, args.min_score, args.max_cost, args.families)
+    records = filter_records(records, options.filters)
     if not records:
         raise SystemExit("All rows were filtered out; relax --min-score/--max-cost/--families")
 
     series_list = build_series(records)
-    if args.top:
-        series_list = series_list[: args.top]
+    if options.filters.top:
+        series_list = series_list[: options.filters.top]
         records = [record for series in series_list for record in series.points]
 
-    fig, ax = plt.subplots(figsize=(args.width, args.height), dpi=args.dpi)
+    fig, ax = plt.subplots(
+        figsize=(options.figure.width, options.figure.height),
+        dpi=options.figure.dpi,
+    )
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
 
@@ -159,7 +183,7 @@ def build_chart(args: argparse.Namespace) -> Path:
             xytext=(8, 8),
             textcoords="offset points",
             color=series.color,
-            fontsize=args.family_fontsize,
+            fontsize=options.figure.family_fontsize,
             fontweight="bold",
             zorder=5,
             arrowprops=dict(arrowstyle="-", color=series.color, linewidth=0.7,
@@ -167,7 +191,7 @@ def build_chart(args: argparse.Namespace) -> Path:
         )
         labels.append((family_label, True))
 
-        if not args.no_effort_labels:
+        if options.figure.show_effort_labels:
             for point in series.points:
                 text = point.effort
                 if point.fallback:
@@ -180,7 +204,7 @@ def build_chart(args: argparse.Namespace) -> Path:
                     xytext=(5, -9),
                     textcoords="offset points",
                     color="#4a4a4a",
-                    fontsize=args.effort_fontsize,
+                    fontsize=options.figure.effort_fontsize,
                     zorder=4,
                     arrowprops=dict(arrowstyle="-", color="#9a9a9a", linewidth=0.5,
                                     shrinkA=1, shrinkB=3),
@@ -199,8 +223,8 @@ def build_chart(args: argparse.Namespace) -> Path:
     ax.set_xticklabels([money(t) for t in ticks])
     ax.xaxis.set_minor_formatter(NullFormatter())
 
-    ax.set_xlabel(args.xlabel, fontsize=12, fontweight="bold", labelpad=10)
-    ax.set_ylabel(args.ylabel, fontsize=12, fontweight="bold", labelpad=10)
+    ax.set_xlabel(options.text.xlabel, fontsize=12, fontweight="bold", labelpad=10)
+    ax.set_ylabel(options.text.ylabel, fontsize=12, fontweight="bold", labelpad=10)
     ax.tick_params(axis="both", labelsize=10, length=0)
     ax.grid(axis="y", color="#e2e2e2", linewidth=0.8)
     ax.set_axisbelow(True)
@@ -209,8 +233,8 @@ def build_chart(args: argparse.Namespace) -> Path:
     for side in ("left", "bottom"):
         ax.spines[side].set_color("#bdbdbd")
 
-    if args.title:
-        ax.set_title(args.title, fontsize=11, color="#333333", loc="left", pad=28)
+    if options.text.title:
+        ax.set_title(options.text.title, fontsize=11, color="#333333", loc="left", pad=28)
     ax.text(
         0.0, 1.015, "HIGHER SCORES ARE BETTER",
         transform=ax.transAxes, fontsize=8, color="#555555", fontweight="bold",
@@ -220,9 +244,9 @@ def build_chart(args: argparse.Namespace) -> Path:
         transform=ax.transAxes, fontsize=8, color="#555555", fontweight="bold",
         ha="right",
     )
-    if args.footnote:
+    if options.text.footnote:
         ax.text(
-            0.0, -0.13, args.footnote,
+            0.0, -0.13, options.text.footnote,
             transform=ax.transAxes, fontsize=9.5, color="#555555",
         )
 
@@ -234,14 +258,14 @@ def build_chart(args: argparse.Namespace) -> Path:
         marker_boxes.append(matplotlib.transforms.Bbox.from_bounds(x - 4, y - 4, 8, 8))
     place_labels(fig, ax, labels, marker_boxes)
 
-    output = Path(args.output) if args.output else source.with_suffix(".png")
+    output = options.output or options.source.with_suffix(".png")
     output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=args.dpi, facecolor=fig.get_facecolor())
+    fig.savefig(output, dpi=options.figure.dpi, facecolor=fig.get_facecolor())
     plt.close(fig)
     return output
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> ChartOptions:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("csv", help="Path to the CSV file with the model data")
     parser.add_argument("-o", "--output", help="Output image path (default: <csv>.png)")
@@ -262,12 +286,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--dpi", type=int, default=140)
     parser.add_argument("--family-fontsize", type=float, default=9.5)
     parser.add_argument("--effort-fontsize", type=float, default=7.5)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    return ChartOptions(
+        source=Path(args.csv),
+        output=Path(args.output) if args.output else None,
+        filters=DataFilters(
+            min_score=args.min_score,
+            max_cost=args.max_cost,
+            families=tuple(args.families or ()),
+            top=args.top,
+        ),
+        text=ChartText(
+            title=args.title,
+            xlabel=args.xlabel,
+            ylabel=args.ylabel,
+            footnote=args.footnote,
+        ),
+        figure=FigureOptions(
+            width=args.width,
+            height=args.height,
+            dpi=args.dpi,
+            family_fontsize=args.family_fontsize,
+            effort_fontsize=args.effort_fontsize,
+            show_effort_labels=not args.no_effort_labels,
+        ),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
-    output = build_chart(args)
+    options = parse_args(argv)
+    output = build_chart(options)
     print(f"Chart written to {output}")
     return 0
 

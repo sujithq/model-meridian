@@ -33,3 +33,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Load complete typed model records in one CSV pass shared by both renderers.
 - Separate interactive-page payload construction, document assembly, HTML,
   styles, and browser JavaScript while preserving the self-contained output.
+- Split browser behavior into focused chart-math, filter-state, SVG-rendering,
+  and UI-orchestration build-time modules.
+- Replace renderer dependencies on broad CLI namespaces with focused, immutable
+  configuration dataclasses and a typed interactive-page payload.

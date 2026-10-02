@@ -20,13 +20,22 @@ The generators live under [`scripts/`](scripts/) and share the same data model i
 
 Each renderer loads the CSV once into shared typed model records containing the
 parsed family, effort, score, cost, source color, and optional model URL.
+Command-line input is translated at each entry point into focused, immutable
+configuration dataclasses for shared filters, chart text, figure rendering, and
+page assembly; renderer internals do not depend on `argparse.Namespace`.
 
 The interactive-page source is separated by responsibility while keeping
 `generate_page.py` as the stable CLI entry point:
 
 - `scripts/page_data.py` builds the serialized chart payload and configuration.
 - `scripts/page_builder.py` loads and embeds the page assets.
-- `scripts/page_assets/` contains the HTML template, CSS, and browser JavaScript.
+- `scripts/page_assets/` contains the HTML template, CSS, and focused browser
+  JavaScript modules for chart math, filter state, SVG rendering, and UI
+  orchestration.
+  - `chart_math.js` contains formatting, tick, and collision helpers.
+  - `filter_state.js` owns filter bounds, selections, matching, and faceting.
+  - `chart_renderer.js` owns the responsive SVG, labels, and tooltip rendering.
+  - `app.js` binds controls and browser events and initializes the page.
 
 These build-time assets are resolved relative to the scripts directory and are
 inlined into the generated HTML, so the published page remains a single

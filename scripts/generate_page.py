@@ -17,11 +17,13 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
-from page_builder import build_page
+from chart_data import ChartText, DataFilters
+from page_builder import PageOptions, PageText, build_page
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> PageOptions:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -44,12 +46,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--families", nargs="+", help="Only include families whose name contains one of these substrings"
     )
     parser.add_argument("--top", type=int, help="Only include the N highest scoring families")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    return PageOptions(
+        source=Path(args.csv),
+        output=Path(args.output) if args.output else None,
+        filters=DataFilters(
+            min_score=args.min_score,
+            max_cost=args.max_cost,
+            families=tuple(args.families or ()),
+            top=args.top,
+        ),
+        text=PageText(
+            chart=ChartText(
+                title=args.title,
+                xlabel=args.xlabel,
+                ylabel=args.ylabel,
+                footnote=args.footnote,
+            ),
+            subtitle=args.subtitle,
+        ),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
-    output = build_page(args)
+    options = parse_args(argv)
+    output = build_page(options)
     print(f"Page written to {output}")
     return 0
 
