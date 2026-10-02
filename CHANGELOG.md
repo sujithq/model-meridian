@@ -14,6 +14,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Synchronized family and reasoning-effort options that respond to search,
   numeric bounds, and one another while preserving existing selections, plus
   score and cost slider ranges that adapt to the active text and categories.
+- Comma-separated multi-term search matching any of the given models or
+  families.
 - Shared `chart_data` module so the image and page renderers group, order and
   colour models identically.
 - Model-family and reasoning-effort parsing with collision-aware labels.

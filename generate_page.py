@@ -88,6 +88,12 @@ TEMPLATE = """<!DOCTYPE html>
     margin-bottom: 6px;
   }
   .field output { font-weight: 400; color: var(--muted); }
+  .field .hint {
+    margin: 6px 0 0;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--muted);
+  }
   input[type="search"], input[type="number"] {
     width: 100%;
     padding: 7px 9px;
@@ -204,8 +210,9 @@ TEMPLATE = """<!DOCTYPE html>
     <h2>Filters</h2>
 
     <div class="field">
-      <label for="search">Search model or family</label>
+      <label for="search">Search models or families</label>
       <input type="search" id="search" placeholder="e.g. opus, gpt-6, gemini" autocomplete="off">
+      <p class="hint">Separate multiple terms with commas to combine them.</p>
     </div>
 
     <div class="field">
@@ -390,7 +397,7 @@ function currentFilters() {
   // the most expensive model.
   const atMax = costStep >= COST_STEPS;
   return {
-    query: els.search.value.trim().toLowerCase(),
+    queries: parseQueries(els.search.value),
     minScore: parseFloat(els.minScore.value),
     maxCost: atMax ? Infinity : sliderToCost(costStep),
     efforts: checkedValues(els.effortChecks),
@@ -398,10 +405,18 @@ function currentFilters() {
   };
 }
 
-function matchesSearch(point, query) {
-  if (!query) return true;
+// Model names contain spaces, so commas separate terms. Any term may match.
+function parseQueries(value) {
+  return value
+    .split(",")
+    .map((term) => term.trim().toLowerCase())
+    .filter((term) => term.length > 0);
+}
+
+function matchesSearch(point, queries) {
+  if (!queries.length) return true;
   const haystack = (point.model + " " + point.family).toLowerCase();
-  return haystack.includes(query);
+  return queries.some((term) => haystack.includes(term));
 }
 
 function matches(point, f) {
@@ -409,14 +424,14 @@ function matches(point, f) {
   if (point.cost > f.maxCost) return false;
   if (!f.efforts.has(point.effort || "(none)")) return false;
   if (!f.families.has(point.family)) return false;
-  if (!matchesSearch(point, f.query)) return false;
+  if (!matchesSearch(point, f.queries)) return false;
   return true;
 }
 
 function matchesBoundsAndSearch(point, f) {
   return point.score >= f.minScore
     && point.cost <= f.maxCost
-    && matchesSearch(point, f.query);
+    && matchesSearch(point, f.queries);
 }
 
 function syncFilterOptions(f) {
@@ -450,7 +465,7 @@ function syncFilterOptions(f) {
 
 function syncSliderRanges(f) {
   const candidates = DATA.filter((point) =>
-    matchesSearch(point, f.query)
+    matchesSearch(point, f.queries)
     && (!f.efforts.size || f.efforts.has(point.effort || "(none)"))
     && (!f.families.size || f.families.has(point.family))
   );

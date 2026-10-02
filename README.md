@@ -82,6 +82,8 @@ The page supports:
   narrow the applicable choices and slider ranges in the other filter groups.
   Broadening a filter restores wider choices without losing slider thresholds
   explicitly chosen by the user.
+- **Multi-term search** — separate terms with commas (for example
+  `gpt-6, claude opus, gemini`) to show every model matching any term.
 - **Score and cost sliders** — raise the minimum score or lower the maximum cost.
 - **Reasoning effort and family checkboxes** — toggle individual series.
 - **Display toggles** — connect efforts within a family, show family labels, and
