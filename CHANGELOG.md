@@ -37,3 +37,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and UI-orchestration build-time modules.
 - Replace renderer dependencies on broad CLI namespaces with focused, immutable
   configuration dataclasses and a typed interactive-page payload.
+- Isolate the browser boundary behind a `ModelSource` protocol so export
+  filtering, ordering, validation, and CSV writing no longer require a browser
+  driver to import or test.

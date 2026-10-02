@@ -41,6 +41,17 @@ These build-time assets are resolved relative to the scripts directory and are
 inlined into the generated HTML, so the published page remains a single
 self-contained file.
 
+The data export is split the same way, keeping the volatile browser boundary
+isolated behind the `ModelSource` protocol:
+
+- `scripts/export_pipeline.py` holds the source-agnostic pipeline — filtering,
+  ordering, de-duplication, CSV validation, and atomic CSV writing. It is
+  standard-library only, so it imports and tests without a browser driver.
+- `scripts/export_source.py` holds the only Playwright-dependent code: the site
+  URL, chart selectors, and the in-page extraction script.
+- `scripts/export_artificial_analysis_csv.py` stays the CLI entry point and just
+  wires the source to the pipeline.
+
 GitHub automation is configured with two workflows in [`.github/workflows/`](.github/workflows/):
 
 - `data-export.yml` refreshes the original source data in `data/data.csv` on a daily schedule or on demand.
@@ -75,7 +86,8 @@ python -m unittest discover -s tests -v
 
 The tests cover model parsing, CSV loading and filtering, series ordering and
 color assignment, interactive-page payload and self-contained output, static
-PNG generation, and export sorting and CSV validation.
+PNG generation, export sorting and CSV validation, and the export pipeline
+driven by an in-memory stand-in for the browser source.
 
 ## Usage
 
