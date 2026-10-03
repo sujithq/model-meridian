@@ -198,6 +198,7 @@ class GeneratedPageTests(unittest.TestCase):
 
         self.assertIn('id="themeToggle" aria-pressed="false">Dark mode', html)
         self.assertIn('document.documentElement.dataset.colorMode = isDark ? "dark" : "light";', html)
+        self.assertIn('els.themeToggle.setAttribute("aria-pressed", String(isDark));', html)
         self.assertIn('html[data-color-mode="dark"] body', html)
         self.assertIn("color-scheme: dark;", html)
 

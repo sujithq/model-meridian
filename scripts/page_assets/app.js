@@ -87,7 +87,6 @@ els.reset.addEventListener("click", resetFilters);
 els.themeToggle.addEventListener("click", () => {
   const isDark = document.documentElement.dataset.colorMode !== "dark";
   document.documentElement.dataset.colorMode = isDark ? "dark" : "light";
-  els.themeToggle.textContent = isDark ? "Light mode" : "Dark mode";
   els.themeToggle.setAttribute("aria-pressed", String(isDark));
 });
 window.addEventListener("scroll", hideTooltip, { passive: true });
