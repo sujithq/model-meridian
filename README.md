@@ -165,7 +165,8 @@ python scripts/generate_page.py data\data.csv -o src\index.html
 
 By default the page is written next to the CSV with an `.html` extension. Open
 the file directly in a browser, or publish it as a static page — it embeds its
-data and has no external dependencies.
+data and has no external dependencies. Use the **Dark mode** button in the page
+header to switch between light and dark appearance.
 
 Select the visual theme explicitly:
 
