@@ -1,6 +1,7 @@
   * { box-sizing: border-box; }
   body { margin: 0; }
   header { padding: 24px 28px 12px; }
+  .header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   h1 { margin: 0 0 6px; }
   .layout {
     display: grid;
