@@ -70,6 +70,17 @@ GitHub automation is configured in [`.github/workflows/`](.github/workflows/):
 - `deploy-pages.yml` builds `src/index.html` from the exported CSV and deploys it to GitHub Pages.
 - `dependabot-sequential-merge.yml` rebases and auto-merges Dependabot pull requests one at a time in creation order.
 
+The project also includes a GitHub Copilot app canvas extension in
+[`.github/extensions/model-meridian/`](.github/extensions/model-meridian/). It
+opens the published interactive explorer at
+<https://model-meridian.quintelier.dev/> in the Copilot app's canvas panel.
+The Copilot app discovers the extension automatically when it starts a session
+for this repository; ask Copilot to open the **Model Meridian** canvas. The
+extension host supplies the Copilot SDK, so no additional runtime dependency
+installation is required. Run `npm run test:canvas` to verify the extension
+entry point and canvas registration. The hosted page must allow iframe
+embedding.
+
 ## Data source
 
 Model and benchmark data originates from

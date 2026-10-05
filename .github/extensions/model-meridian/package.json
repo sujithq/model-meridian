@@ -1,0 +1,14 @@
+{
+  "name": "model-meridian-canvas",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub Copilot canvas extension for Model Meridian.",
+  "main": "./extension.mjs",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "test": "node test.mjs"
+  }
+}
