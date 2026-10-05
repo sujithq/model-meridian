@@ -104,7 +104,8 @@ def read_script() -> str:
 
 
 def read_styles(theme: PageTheme) -> str:
-    return "\n\n".join(read_asset(name) for name in theme_spec(theme).styles)
+    styles = (*theme_spec(theme).styles, "color_mode.css")
+    return "\n\n".join(read_asset(name) for name in styles)
 
 
 def theme_spec(theme: PageTheme) -> ThemeSpec:

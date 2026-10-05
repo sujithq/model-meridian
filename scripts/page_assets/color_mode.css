@@ -1,0 +1,58 @@
+  html[data-color-mode="dark"] {
+    color-scheme: dark;
+    --bg: #17191d;
+    --ink: #e5e7eb;
+    --muted: #a1a1aa;
+    --line: #3f434a;
+    --panel: #22252b;
+    --pico-background-color: #17191d;
+    --pico-color: #e5e7eb;
+    --pico-muted-color: #a1a1aa;
+    --pico-card-background-color: #22252b;
+    --pico-card-border-color: #3f434a;
+    --pico-form-element-background-color: #22252b;
+    --pico-form-element-color: #e5e7eb;
+    --pico-form-element-border-color: #4b5563;
+    --pico-contrast-background: #e5e7eb;
+    --pico-contrast-inverse: #17191d;
+    --bulma-scheme-main: #17191d;
+    --bulma-scheme-main-bis: #22252b;
+    --bulma-text: #e5e7eb;
+    --bulma-text-strong: #f3f4f6;
+    --bulma-text-weak: #a1a1aa;
+    --bulma-border-weak: #3f434a;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  html[data-color-mode="dark"] body { background: var(--bg); color: var(--ink); }
+  html[data-color-mode="dark"] header h1 { color: var(--ink); }
+  html[data-color-mode="dark"] .panel,
+  html[data-color-mode="dark"] .chart-wrap {
+    border-color: var(--line);
+    background: var(--panel);
+  }
+  html[data-color-mode="dark"] .checks,
+  html[data-color-mode="dark"] input[type="search"],
+  html[data-color-mode="dark"] input[type="number"],
+  html[data-color-mode="dark"] button {
+    border-color: #4b5563;
+    background: #22252b;
+    color: var(--ink);
+  }
+  html[data-color-mode="dark"] .field label,
+  html[data-color-mode="dark"] .checks label,
+  html[data-color-mode="dark"] .toggles label { color: var(--ink); }
+  html[data-color-mode="dark"] .subtitle,
+  html[data-color-mode="dark"] .panel h2,
+  html[data-color-mode="dark"] .field output,
+  html[data-color-mode="dark"] .field .hint,
+  html[data-color-mode="dark"] .status,
+  html[data-color-mode="dark"] footer,
+  html[data-color-mode="dark"] .empty { color: var(--muted); }
+  html[data-color-mode="dark"] button:hover { background: #343942; }
+  html[data-color-mode="dark"] .axis-label { fill: var(--ink); }
+  html[data-color-mode="dark"] .tick-label,
+  html[data-color-mode="dark"] .note,
+  html[data-color-mode="dark"] .effort-label { fill: var(--muted); }
+  html[data-color-mode="dark"] #chart line { stroke: #4b5563; }
+  html[data-color-mode="dark"] .dot:hover { stroke: #fff; }

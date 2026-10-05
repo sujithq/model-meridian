@@ -190,6 +190,18 @@ class GeneratedPageTests(unittest.TestCase):
         self.assertIn(":root {", html)
         self.assertIn("function render()", html)
 
+    def test_page_includes_dark_mode_toggle_and_styles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            options = page_options(source)
+            html = assemble_page(payload_for(options), options.text)
+
+        self.assertIn('id="themeToggle" aria-pressed="false">Dark mode', html)
+        self.assertIn('document.documentElement.dataset.colorMode = isDark ? "dark" : "light";', html)
+        self.assertIn('els.themeToggle.setAttribute("aria-pressed", String(isDark));', html)
+        self.assertIn('html[data-color-mode="dark"] body', html)
+        self.assertIn("color-scheme: dark;", html)
+
     def test_native_theme_embeds_base_styles_before_theme_styles(self) -> None:
         styles = read_styles(PageTheme.NATIVE)
 

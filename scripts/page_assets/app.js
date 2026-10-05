@@ -11,6 +11,7 @@ const els = {
   showEffortLabels: document.getElementById("showEffortLabels"),
   selectAll: document.getElementById("selectAll"),
   reset: document.getElementById("reset"),
+  themeToggle: document.getElementById("themeToggle"),
 };
 
 function buildChecks(container, items, nameKey) {
@@ -83,6 +84,11 @@ els.showFamilyLabels.addEventListener("change", render);
 els.showEffortLabels.addEventListener("change", render);
 els.selectAll.addEventListener("click", selectAllChecks);
 els.reset.addEventListener("click", resetFilters);
+els.themeToggle.addEventListener("click", () => {
+  const isDark = document.documentElement.dataset.colorMode !== "dark";
+  document.documentElement.dataset.colorMode = isDark ? "dark" : "light";
+  els.themeToggle.setAttribute("aria-pressed", String(isDark));
+});
 window.addEventListener("scroll", hideTooltip, { passive: true });
 let resizeFrame = 0;
 window.addEventListener("resize", () => {
