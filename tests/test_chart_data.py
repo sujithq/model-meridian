@@ -27,6 +27,14 @@ class ModelNameParsingTests(unittest.TestCase):
             ("Claude Opus 5.5", "max", True),
         )
 
+    def test_parses_effort_with_trailing_source_marker(self) -> None:
+        for effort in ("max", "xhigh", "high", "medium", "low"):
+            with self.subTest(effort=effort):
+                self.assertEqual(
+                    parse_model_name(f"Claude Haiku 5.5 ({effort})*"),
+                    ("Claude Haiku 5.5", effort, False),
+                )
+
     def test_preserves_model_without_effort(self) -> None:
         self.assertEqual(parse_model_name("Kimi K2.6"), ("Kimi K2.6", "", False))
 
