@@ -73,16 +73,18 @@ class Series:
 
 def parse_model_name(name: str) -> tuple[str, str, bool]:
     """Split a model name into (family, reasoning effort, fallback flag)."""
-    match = NAME_RE.match(name.strip())
+    name = name.strip()
+    parse_name = name.removesuffix("*").rstrip()
+    match = NAME_RE.match(parse_name)
     if not match:
-        return name.strip(), "", False
+        return parse_name, "", False
     family = match.group("family").strip()
     effort = match.group("effort").strip()
     fallback = bool(FALLBACK_RE.search(effort))
     if fallback:
         effort = FALLBACK_RE.sub(" ", effort).strip()
     if not family:  # e.g. a name that is entirely parenthesised
-        return name.strip(), "", fallback
+        return parse_name, "", fallback
     return family, effort, fallback
 
 
