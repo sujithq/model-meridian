@@ -28,12 +28,14 @@
     font-weight: 600;
   }
   .field output { font-weight: 400; color: var(--muted); }
+  .chart-controls label { font-size: 13px; font-weight: 600; }
+  .chart-controls .hint { color: var(--muted); font-size: 11.5px; }
   .field .hint {
     font-size: 11.5px;
     font-weight: 400;
     color: var(--muted);
   }
-  input[type="search"], input[type="number"] {
+  input[type="search"], input[type="number"], .chart-controls select {
     border: 1px solid #cfcfd3;
     border-radius: 6px;
     font: inherit;

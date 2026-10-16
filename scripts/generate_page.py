@@ -19,7 +19,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from chart_data import ChartText, DataFilters
+from chart_data import ChartText, CostScale, DataFilters
 from page_builder import PageOptions, PageText, PageTheme, build_page
 
 
@@ -36,6 +36,12 @@ def parse_args(argv: list[str] | None = None) -> PageOptions:
     )
     parser.add_argument("--xlabel", default="Cost per benchmark task (USD)")
     parser.add_argument("--ylabel", default="Intelligence Index Score")
+    parser.add_argument(
+        "--x-scale",
+        choices=tuple(scale.value for scale in CostScale),
+        default=CostScale.LOGARITHMIC.value,
+        help="Default cost-axis scale; a saved browser preference takes precedence",
+    )
     parser.add_argument(
         "--footnote",
         default="Data source: Artificial Analysis · Scores and task costs from the source dataset.",
@@ -71,6 +77,7 @@ def parse_args(argv: list[str] | None = None) -> PageOptions:
             ),
             subtitle=args.subtitle,
         ),
+        cost_scale=CostScale(args.x_scale),
         theme=PageTheme(args.theme),
     )
 

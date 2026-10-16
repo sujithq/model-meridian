@@ -12,7 +12,7 @@ from unittest import mock
 from tests.helpers import FIELDNAMES, write_fixture_csv
 
 import page_builder
-from chart_data import ChartText, DataFilters
+from chart_data import ChartText, CostScale, DataFilters
 from generate_page import parse_args
 from page_builder import (
     ASSET_DIR,
@@ -68,6 +68,7 @@ class PagePayloadTests(unittest.TestCase):
         self.assertEqual(payload.config["maxScore"], 50.0)
         self.assertEqual(payload.config["minCost"], 0.5)
         self.assertEqual(payload.config["maxCost"], 2.0)
+        self.assertEqual(payload.config["costScale"], "logarithmic")
 
     def test_payload_applies_starting_filters(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -80,6 +81,22 @@ class PagePayloadTests(unittest.TestCase):
             )
 
         self.assertEqual([record["model"] for record in payload.records], ["Beta"])
+
+    def test_payload_preserves_small_positive_costs_for_log_scale(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "tiny-cost.csv"
+            source.write_text(
+                "model,cost_per_task_usd,intelligence_index,color\n"
+                "Tiny,0.0000004,10,#123456\n",
+                encoding="utf-8",
+            )
+            payload = build_payload(
+                source, DataFilters(), page_options(source).text.chart
+            )
+
+        self.assertEqual(payload.records[0]["cost"], 0.0000004)
+        self.assertGreater(payload.config["minCost"], 0)
+        self.assertEqual(payload.config["costScale"], "logarithmic")
 
     def test_duplicate_labels_keep_row_specific_urls(self) -> None:
         rows = [
@@ -143,7 +160,13 @@ class PagePayloadTests(unittest.TestCase):
         self.assertEqual(options.source, Path("models.csv"))
         self.assertEqual(options.filters.families, ("Alpha", "Beta"))
         self.assertEqual(options.filters.min_score, 42.0)
+        self.assertEqual(options.cost_scale, CostScale.LOGARITHMIC)
         self.assertEqual(options.theme, PageTheme.NATIVE)
+
+    def test_parse_args_selects_linear_cost_scale(self) -> None:
+        options = parse_args(["models.csv", "--x-scale", "linear"])
+
+        self.assertEqual(options.cost_scale, CostScale.LINEAR)
 
     def test_parse_args_rejects_an_unknown_theme(self) -> None:
         with mock.patch("sys.stderr", new_callable=io.StringIO):
@@ -176,6 +199,13 @@ class GeneratedPageTests(unittest.TestCase):
         self.assertNotIn("https://cdn.", html)
         self.assertIn("* { box-sizing: border-box; }", html)
         self.assertIn("--bg: #ffffff;", html)
+        self.assertIn('id="xScale"', html)
+        self.assertIn('value="logarithmic">Logarithmic', html)
+        self.assertIn("LOG SCALE · EQUAL SPACING = EQUAL COST RATIOS", html)
+        self.assertIn("LINEAR SCALE · EQUAL SPACING = EQUAL DOLLAR DIFFERENCES", html)
+        self.assertIn('localStorage.setItem(SCALE_STORAGE_KEY, els.xScale.value)', html)
+        self.assertIn("const costScale = els.xScale.value;", html)
+        self.assertIn("Math.log10(cost)", html)
 
     def test_page_replaces_all_placeholders_and_embeds_assets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -52,6 +52,26 @@
     margin: 0;
     font-size: 0.8125rem;
   }
+  .chart-controls label {
+    color: var(--bulma-text);
+    font-size: 0.8125rem;
+    font-weight: var(--bulma-weight-semibold);
+  }
+  .chart-controls .hint {
+    color: var(--bulma-text-weak);
+    font-size: 0.71875rem;
+  }
+  .chart-controls select {
+    height: auto;
+    margin: 0;
+    border: 1px solid var(--bulma-border-weak);
+    border-radius: var(--bulma-radius);
+    padding: 6px 8px;
+    background: var(--bulma-scheme-main);
+    color: var(--bulma-text);
+    font: inherit;
+    font-size: 0.8125rem;
+  }
   input[type="range"] { margin: 0; }
   .checks {
     border: 1px solid var(--bulma-border-weak);

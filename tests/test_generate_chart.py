@@ -5,9 +5,11 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+
 from tests.helpers import write_fixture_csv
 
-from chart_data import ChartText, DataFilters
+from chart_data import ChartText, CostScale, DataFilters
 from generate_chart import ChartOptions, FigureOptions, build_chart, parse_args
 
 
@@ -20,6 +22,7 @@ class StaticChartTests(unittest.TestCase):
             options = ChartOptions(
                 source=source,
                 output=output,
+                cost_scale=CostScale.LINEAR,
                 filters=DataFilters(),
                 text=ChartText(
                     title="Model Meridian",
@@ -44,8 +47,18 @@ class StaticChartTests(unittest.TestCase):
                     opened_sources.append(path)
                 return original_open(path, *args, **kwargs)
 
-            with mock.patch.object(Path, "open", tracked_open):
+            with (
+                mock.patch.object(Path, "open", tracked_open),
+                mock.patch("generate_chart.plt.close", wraps=plt.close) as close,
+            ):
                 result = build_chart(options)
+            figure = close.call_args.args[0]
+            axis = figure.axes[0]
+            self.assertEqual(axis.get_xscale(), "linear")
+            self.assertEqual(axis.get_xlim(), (0, 2.2))
+            self.assertEqual(list(axis.get_xticks()), [0, 0.5, 1, 1.5, 2])
+            positions = [axis.transData.transform((cost, 45))[0] for cost in (0, 1, 2)]
+            self.assertAlmostEqual(positions[1] - positions[0], positions[2] - positions[1])
             content = result.read_bytes()
 
         self.assertEqual(result, output)
@@ -64,8 +77,34 @@ class StaticChartTests(unittest.TestCase):
 
         self.assertIsInstance(options, ChartOptions)
         self.assertEqual(options.source, Path("models.csv"))
+        self.assertEqual(options.cost_scale, CostScale.LOGARITHMIC)
         self.assertEqual(options.filters.families, ("Alpha", "Beta"))
         self.assertFalse(options.figure.show_effort_labels)
+
+    def test_parse_args_selects_linear_cost_scale(self) -> None:
+        options = parse_args(["models.csv", "--x-scale", "linear"])
+
+        self.assertEqual(options.cost_scale, CostScale.LINEAR)
+
+    def test_default_chart_uses_logarithmic_cost_scale(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = write_fixture_csv(Path(directory) / "models.csv")
+            options = ChartOptions(
+                source=source,
+                output=Path(directory) / "chart.png",
+                cost_scale=CostScale.LOGARITHMIC,
+                filters=DataFilters(),
+                text=ChartText("Title", "Cost", "Score", ""),
+                figure=FigureOptions(width=8, height=4.5, dpi=80),
+            )
+            with mock.patch("generate_chart.plt.close", wraps=plt.close) as close:
+                build_chart(options)
+
+        axis = close.call_args.args[0].axes[0]
+        self.assertEqual(axis.get_xscale(), "log")
+        self.assertEqual(axis.get_xlim(), (0.5 / 2.2, 2.0 * 2.2))
+        positions = [axis.transData.transform((cost, 45))[0] for cost in (0.5, 1, 2)]
+        self.assertAlmostEqual(positions[1] - positions[0], positions[2] - positions[1])
 
 
 if __name__ == "__main__":

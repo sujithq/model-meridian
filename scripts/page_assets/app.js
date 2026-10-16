@@ -12,7 +12,27 @@ const els = {
   selectAll: document.getElementById("selectAll"),
   reset: document.getElementById("reset"),
   themeToggle: document.getElementById("themeToggle"),
+  xScale: document.getElementById("xScale"),
+  xScaleHelp: document.getElementById("xScaleHelp"),
 };
+
+const SCALE_STORAGE_KEY = "modelMeridian.costScale";
+
+function scaleHelp(scale) {
+  return scale === "logarithmic"
+    ? "Log scale: equal spacing represents equal cost ratios, not equal dollar differences."
+    : "Linear scale: equal spacing represents equal dollar differences.";
+}
+
+function loadCostScale() {
+  try {
+    const saved = localStorage.getItem(SCALE_STORAGE_KEY);
+    if (saved === "linear" || saved === "logarithmic") return saved;
+  } catch (error) {
+    console.warn("Could not read the saved cost-axis scale preference.", error);
+  }
+  return CONFIG.costScale;
+}
 
 function buildChecks(container, items, nameKey) {
   container.textContent = "";
@@ -65,6 +85,8 @@ buildChecks(
   CONFIG.families.map((f) => ({ value: f.name, label: f.name, color: f.color })),
   "family"
 );
+els.xScale.value = loadCostScale();
+els.xScaleHelp.textContent = scaleHelp(els.xScale.value);
 setupRanges();
 
 ["input", "change"].forEach((evt) => {
@@ -82,6 +104,15 @@ setupRanges();
 els.showLines.addEventListener("change", render);
 els.showFamilyLabels.addEventListener("change", render);
 els.showEffortLabels.addEventListener("change", render);
+els.xScale.addEventListener("change", () => {
+  els.xScaleHelp.textContent = scaleHelp(els.xScale.value);
+  try {
+    localStorage.setItem(SCALE_STORAGE_KEY, els.xScale.value);
+  } catch (error) {
+    console.warn("Could not save the cost-axis scale preference.", error);
+  }
+  render();
+});
 els.selectAll.addEventListener("click", selectAllChecks);
 els.reset.addEventListener("click", resetFilters);
 els.themeToggle.addEventListener("click", () => {

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from chart_data import (
     ChartText,
+    CostScale,
     DataFilters,
     EFFORT_ORDER,
     build_series,
@@ -34,7 +35,12 @@ def dash_for(linestyle: object, index: int) -> str:
     return DASH_PATTERNS[index % len(DASH_PATTERNS)]
 
 
-def build_payload(source: Path, filters: DataFilters, text: ChartText) -> PagePayload:
+def build_payload(
+    source: Path,
+    filters: DataFilters,
+    text: ChartText,
+    cost_scale: CostScale = CostScale.LOGARITHMIC,
+) -> PagePayload:
     model_records = read_model_records(source)
     if not model_records:
         raise SystemExit(f"No usable rows found in {source}")
@@ -59,7 +65,7 @@ def build_payload(source: Path, filters: DataFilters, text: ChartText) -> PagePa
                     "family": point.family,
                     "effort": point.effort,
                     "fallback": point.fallback,
-                    "cost": round(point.cost, 6),
+                    "cost": point.cost,
                     "score": round(point.score, 4),
                     "color": series.color,
                     "dash": dash,
@@ -77,6 +83,7 @@ def build_payload(source: Path, filters: DataFilters, text: ChartText) -> PagePa
     config = {
         "xlabel": text.xlabel,
         "ylabel": text.ylabel,
+        "costScale": cost_scale.value,
         "efforts": efforts,
         "families": sorted(family_meta, key=lambda family: family["name"].lower()),
         "minScore": min(record["score"] for record in records),

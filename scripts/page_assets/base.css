@@ -60,6 +60,16 @@
     .chart-wrap svg { height: 100%; }
   }
   .status { padding: 8px 2px 0; }
+  .chart-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .chart-controls label { margin: 0; }
+  .chart-controls select { min-width: 130px; padding: 6px 8px; }
+  .chart-controls .hint { flex: 1 1 260px; margin: 0; }
   #tooltip {
     position: fixed;
     z-index: 10;

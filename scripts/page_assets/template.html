@@ -60,6 +60,14 @@ __STYLES__
   </aside>
 
   <main>
+    <div class="chart-controls">
+      <label for="xScale">Cost scale</label>
+      <select id="xScale" aria-describedby="xScaleHelp">
+        <option value="logarithmic">Logarithmic</option>
+        <option value="linear">Linear</option>
+      </select>
+      <p class="hint" id="xScaleHelp" aria-live="polite"></p>
+    </div>
     <div class="chart-wrap __CHART_CLASSES__">
       <svg id="chart" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" role="img"
            aria-label="Intelligence score versus cost per task"></svg>

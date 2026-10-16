@@ -28,10 +28,11 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FixedLocator, NullFormatter
+from matplotlib.ticker import FixedLocator
 
 from chart_data import (
     ChartText,
+    CostScale,
     DataFilters,
     build_series,
     cost_ticks,
@@ -55,6 +56,7 @@ class FigureOptions:
 class ChartOptions:
     source: Path
     output: Path | None
+    cost_scale: CostScale
     filters: DataFilters
     text: ChartText
     figure: FigureOptions
@@ -213,15 +215,18 @@ def build_chart(options: ChartOptions) -> Path:
 
     costs = [record.cost for record in records]
     scores = [record.score for record in records]
-    ax.set_xscale("log")
-    ax.set_xlim(min(costs) / 2.2, max(costs) * 2.6)
+    if options.cost_scale is CostScale.LOGARITHMIC:
+        ax.set_xscale("log")
+        ax.set_xlim(min(costs) / 2.2, max(costs) * 2.2)
+    else:
+        ax.set_xscale("linear")
+        ax.set_xlim(0, max(costs) * 1.1)
     score_pad = max(2.0, (max(scores) - min(scores)) * 0.08)
     ax.set_ylim(min(scores) - score_pad, max(scores) + score_pad * 1.3)
 
-    ticks = cost_ticks(*ax.get_xlim())
+    ticks = cost_ticks(*ax.get_xlim(), scale=options.cost_scale)
     ax.xaxis.set_major_locator(FixedLocator(ticks))
     ax.set_xticklabels([money(t) for t in ticks])
-    ax.xaxis.set_minor_formatter(NullFormatter())
 
     ax.set_xlabel(options.text.xlabel, fontsize=12, fontweight="bold", labelpad=10)
     ax.set_ylabel(options.text.ylabel, fontsize=12, fontweight="bold", labelpad=10)
@@ -240,7 +245,12 @@ def build_chart(options: ChartOptions) -> Path:
         transform=ax.transAxes, fontsize=8, color="#555555", fontweight="bold",
     )
     ax.text(
-        1.0, 1.015, "LOGARITHMIC COST SCALE",
+        1.0, 1.015,
+        (
+            "LOG SCALE · EQUAL SPACING = EQUAL COST RATIOS"
+            if options.cost_scale is CostScale.LOGARITHMIC
+            else "LINEAR SCALE · EQUAL SPACING = EQUAL DOLLAR DIFFERENCES"
+        ),
         transform=ax.transAxes, fontsize=8, color="#555555", fontweight="bold",
         ha="right",
     )
@@ -273,6 +283,12 @@ def parse_args(argv: list[str] | None = None) -> ChartOptions:
     parser.add_argument("--xlabel", default="Cost per benchmark task (USD)")
     parser.add_argument("--ylabel", default="Intelligence Index Score")
     parser.add_argument(
+        "--x-scale",
+        choices=tuple(scale.value for scale in CostScale),
+        default=CostScale.LOGARITHMIC.value,
+        help="Cost-axis scale (default: logarithmic)",
+    )
+    parser.add_argument(
         "--footnote",
         default="Data source: Artificial Analysis · Scores and task costs from the source dataset.",
     )
@@ -290,6 +306,7 @@ def parse_args(argv: list[str] | None = None) -> ChartOptions:
     return ChartOptions(
         source=Path(args.csv),
         output=Path(args.output) if args.output else None,
+        cost_scale=CostScale(args.x_scale),
         filters=DataFilters(
             min_score=args.min_score,
             max_cost=args.max_cost,

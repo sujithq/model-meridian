@@ -12,7 +12,13 @@ import csv
 import math
 import re
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
+
+class CostScale(str, Enum):
+    LINEAR = "linear"
+    LOGARITHMIC = "logarithmic"
+
 
 NAME_RE = re.compile(r"^(?P<family>.*?)\s*\((?P<effort>[^)]*)\)\s*$")
 FALLBACK_RE = re.compile(r"\s*with\s+fallback\s*", re.IGNORECASE)
@@ -204,18 +210,31 @@ def filter_records(
     return records
 
 
-def cost_ticks(lo: float, hi: float) -> list[float]:
-    candidates = [
-        0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5,
-        1, 2, 5, 10, 20, 50, 100, 200, 500,
+def cost_ticks(
+    lo: float, hi: float, scale: CostScale = CostScale.LINEAR
+) -> list[float]:
+    if scale is CostScale.LOGARITHMIC:
+        first_exponent = math.floor(math.log10(lo))
+        last_exponent = math.ceil(math.log10(hi))
+        ticks = [
+            multiplier * 10**exponent
+            for exponent in range(first_exponent, last_exponent + 1)
+            for multiplier in (1, 2, 5)
+            if lo <= multiplier * 10**exponent <= hi
+        ]
+        return ticks or [lo, hi]
+
+    raw_step = (hi - lo) / 5
+    magnitude = 10 ** math.floor(math.log10(raw_step))
+    step = next(size for size in (1, 2, 5, 10) if size >= raw_step / magnitude) * magnitude
+    return [
+        index * step
+        for index in range(math.ceil(lo / step), math.floor(hi / step) + 1)
     ]
-    ticks = [t for t in candidates if lo <= t <= hi]
-    return ticks or [lo, hi]
 
 
 def money(value: float) -> str:
-    if value >= 1:
-        return f"${value:,.0f}"
-    if value >= 0.01:
-        return f"${value:.2f}"
-    return f"${value:.3f}"
+    if value == 0:
+        return "$0.00"
+    decimals = max(2, min(12, 2 - math.floor(math.log10(value))))
+    return "$" + f"{value:,.{decimals}f}".rstrip("0").rstrip(".")

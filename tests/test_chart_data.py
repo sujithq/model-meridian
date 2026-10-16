@@ -8,6 +8,7 @@ from tests.helpers import write_fixture_csv
 
 from chart_data import (
     DataFilters,
+    CostScale,
     DEFAULT_COLOR,
     ModelRecord,
     build_series,
@@ -95,12 +96,36 @@ class SeriesAndFilterTests(unittest.TestCase):
         self.assertEqual([point.model for point in filtered], ["Alpha (low)", "Beta"])
         self.assertEqual(len(self.records), 4)
 
-    def test_formatting_and_tick_fallbacks(self) -> None:
-        self.assertEqual(money(2.4), "$2")
-        self.assertEqual(money(0.125), "$0.12")
+    def test_cost_formatting_preserves_fractional_dollars(self) -> None:
+        self.assertEqual(money(0), "$0.00")
+        self.assertEqual(money(2), "$2")
+        self.assertEqual(money(2.4), "$2.4")
+        self.assertEqual(money(2.5), "$2.5")
+        self.assertEqual(money(0.125), "$0.125")
         self.assertEqual(money(0.005), "$0.005")
-        self.assertEqual(cost_ticks(0.01, 0.05), [0.01, 0.02, 0.05])
-        self.assertEqual(cost_ticks(601, 700), [601, 700])
+        self.assertEqual(money(0.0002), "$0.0002")
+
+    def test_cost_ticks_are_evenly_spaced_across_cost_ranges(self) -> None:
+        for upper_bound in (0.00022, 0.00055, 0.055, 2.2, 22, 770):
+            with self.subTest(upper_bound=upper_bound):
+                ticks = cost_ticks(0, upper_bound)
+                self.assertEqual(ticks[0], 0)
+                self.assertGreaterEqual(len(ticks), 3)
+                self.assertLessEqual(len(ticks), 6)
+                self.assertLessEqual(ticks[-1], upper_bound)
+                for left, right in zip(ticks, ticks[1:]):
+                    self.assertAlmostEqual(right - left, ticks[1])
+                self.assertEqual(len(set(map(money, ticks))), len(ticks))
+
+        self.assertEqual(cost_ticks(0, 2.2), [0, 0.5, 1, 1.5, 2])
+        self.assertEqual(cost_ticks(601, 700), [620, 640, 660, 680, 700])
+
+    def test_log_cost_ticks_follow_ratio_scale(self) -> None:
+        ticks = cost_ticks(0.01, 10, CostScale.LOGARITHMIC)
+
+        self.assertEqual(ticks, [
+            0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10,
+        ])
 
     def test_invalid_color_uses_default(self) -> None:
         self.assertEqual(shade("not-a-color", 0, 0), DEFAULT_COLOR)

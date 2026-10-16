@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from chart_data import ChartText, DataFilters
+from chart_data import ChartText, CostScale, DataFilters
 from page_data import PagePayload, build_payload
 
 ASSET_DIR = Path(__file__).resolve().parent / "page_assets"
@@ -79,6 +79,7 @@ class PageOptions:
     output: Path | None
     filters: DataFilters
     text: PageText
+    cost_scale: CostScale = CostScale.LOGARITHMIC
     theme: PageTheme = PageTheme.NATIVE
 
 
@@ -147,7 +148,9 @@ def assemble_page(
 
 
 def build_page(options: PageOptions) -> Path:
-    payload = build_payload(options.source, options.filters, options.text.chart)
+    payload = build_payload(
+        options.source, options.filters, options.text.chart, options.cost_scale
+    )
     html = assemble_page(payload, options.text, options.theme)
     output = options.output or options.source.with_suffix(".html")
     output.parent.mkdir(parents=True, exist_ok=True)

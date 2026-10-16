@@ -7,9 +7,14 @@ also generates labelled static charts from the same CSV data. Models in the
 same family are connected across reasoning-effort levels, while models with
 only one data point are shown as diamonds.
 
-The chart uses a logarithmic cost axis, colors from the input data, and
-collision-aware labels. It is designed to produce charts similar to
-[`data/example-chart.png`](data/example-chart.png).
+Both charts offer logarithmic and linear USD cost scales. The interactive chart
+defaults to logarithmic and remembers the selected scale in the browser. Its
+visible scale selector explains that logarithmic spacing represents cost
+ratios, while linear spacing represents equal dollar differences. The static
+chart also defaults to logarithmic; use `--x-scale linear` for a linear view.
+Colors come from the input data, with collision-aware labels. The original
+[`data/example-chart.png`](data/example-chart.png) is a visual reference for
+the styling, not the current axis scale.
 
 The generators live under [`scripts/`](scripts/) and share the same data model in [`scripts/chart_data.py`](scripts/chart_data.py):
 
@@ -151,6 +156,12 @@ Choose a different output path:
 python scripts\generate_chart.py data\data.csv -o out\chart.png
 ```
 
+Choose the cost-axis scale (`logarithmic` is the default):
+
+```powershell
+python scripts\generate_chart.py data\data.csv -o out\chart-linear.png --x-scale linear
+```
+
 Create a less crowded chart by filtering the data:
 
 ```powershell
@@ -177,7 +188,10 @@ python scripts/generate_page.py data\data.csv -o src\index.html
 By default the page is written next to the CSV with an `.html` extension. Open
 the file directly in a browser, or publish it as a static page — it embeds its
 data and has no external dependencies. Use the **Dark mode** button in the page
-header to switch between light and dark appearance.
+header to switch between light and dark appearance. The visible **Cost scale**
+selector switches between logarithmic and linear axes, explains the spacing,
+and remembers your choice in the browser. Use `--x-scale` to set the initial
+selection for a generated page; a saved browser preference takes precedence.
 
 Select the visual theme explicitly:
 

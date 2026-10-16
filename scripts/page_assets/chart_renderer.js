@@ -90,15 +90,19 @@ function render() {
 
   const costs = visible.map((p) => p.cost);
   const scores = visible.map((p) => p.score);
-  const xLo = Math.min(...costs) / 1.9;
-  const xHi = Math.max(...costs) * 2.2;
+  const costScale = els.xScale.value;
+  const xLo = costScale === "logarithmic" ? Math.min(...costs) / 1.9 : 0;
+  const xHi = Math.max(...costs) * (costScale === "logarithmic" ? 2.2 : 1.1);
   const scorePad = Math.max(2, (Math.max(...scores) - Math.min(...scores)) * 0.08);
   const yLo = Math.min(...scores) - scorePad;
   const yHi = Math.max(...scores) + scorePad;
 
-  const lx = Math.log10(xLo), lxSpan = Math.log10(xHi) - lx;
-  const xScale = (cost) =>
-    PAD.left + ((Math.log10(cost) - lx) / lxSpan) * (W - PAD.left - PAD.right);
+  const xScale = costScale === "logarithmic"
+    ? (cost) => PAD.left
+      + ((Math.log10(cost) - Math.log10(xLo))
+        / (Math.log10(xHi) - Math.log10(xLo))) * (W - PAD.left - PAD.right)
+    : (cost) => PAD.left
+      + ((cost - xLo) / (xHi - xLo)) * (W - PAD.left - PAD.right);
   const yScale = (score) =>
     H - PAD.bottom - ((score - yLo) / (yHi - yLo)) * (H - PAD.top - PAD.bottom);
 
@@ -112,7 +116,7 @@ function render() {
       x: PAD.left - 12, y: y + 4, "text-anchor": "end", class: "tick-label",
     }, String(tick)));
   }
-  for (const tick of costTicks(xLo, xHi)) {
+  for (const tick of costTicks(xLo, xHi, costScale)) {
     const x = xScale(tick);
     svg.appendChild(el("text", {
       x, y: H - PAD.bottom + 26, "text-anchor": "middle", class: "tick-label",
@@ -131,7 +135,9 @@ function render() {
   }, "HIGHER SCORES ARE BETTER"));
   svg.appendChild(el("text", {
     x: W - PAD.right, y: PAD.top - 24, "text-anchor": "end", class: "note",
-  }, "LOGARITHMIC COST SCALE"));
+  }, costScale === "logarithmic"
+    ? "LOG SCALE · EQUAL SPACING = EQUAL COST RATIOS"
+    : "LINEAR SCALE · EQUAL SPACING = EQUAL DOLLAR DIFFERENCES"));
   svg.appendChild(el("text", {
     x: (PAD.left + W - PAD.right) / 2, y: H - 22, "text-anchor": "middle", class: "axis-label",
   }, CONFIG.xlabel));
