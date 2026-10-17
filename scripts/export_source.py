@@ -19,14 +19,13 @@ TARGET_SECTION_ID = "intelligence-index-vs-cost-per-task-by-model-release"
 TARGET_TITLE = "Intelligence Index vs. Cost per Task, by Model Release"
 OUTPUT_SLUG = "artificial-analysis-intelligence-index-vs-cost-all-plotted-models"
 
-PAGE_TIMEOUT = 120000
-DIALOG_TIMEOUT = 30000
-SETTLE_DELAY = 3000
+PAGE_TIMEOUT = 600000
+DIALOG_TIMEOUT = 60000
+SETTLE_DELAY = 6000
 VIEWPORT = {"width": 1600, "height": 1200}
 
 SELECTION_COMPLETE_SCRIPT = """
-(sectionId) => {
-  const chart = document.getElementById(sectionId);
+(chart) => {
   const selector = chart?.querySelector('button[role="combobox"]');
   if (!selector) return false;
   const text = (selector.textContent || '').trim();
@@ -36,8 +35,7 @@ SELECTION_COMPLETE_SCRIPT = """
 """
 
 EXTRACTION_SCRIPT = """
-(sectionId) => {
-  const chart = document.getElementById(sectionId);
+(chart) => {
   if (!chart) return { candidateCount: 0, rows: [] };
   const candidates = [
     ...chart.querySelectorAll(
@@ -160,12 +158,16 @@ class PlaywrightChartSource:
         return self._page
 
     def _chart(self):
-        return self._active_page.locator(f"#{TARGET_SECTION_ID}")
+        return self._active_page.get_by_text(TARGET_TITLE, exact=True).locator(
+            "xpath=ancestor::*[.//*[local-name()='svg' and "
+            "contains(concat(' ', normalize-space(@class), ' '), "
+            "' recharts-surface ')]][1]"
+        )
 
     def _open_chart(self) -> None:
         page = self._active_page
         page.goto(
-            f"{SITE_URL}#{TARGET_SECTION_ID}",
+            SITE_URL,
             wait_until="domcontentloaded",
             timeout=self._timeout,
         )
@@ -201,7 +203,7 @@ class PlaywrightChartSource:
 
         page.wait_for_function(
             SELECTION_COMPLETE_SCRIPT,
-            arg=TARGET_SECTION_ID,
+            arg=self._chart().element_handle(),
             timeout=self._timeout,
         )
         if dialog.is_visible():
@@ -211,7 +213,7 @@ class PlaywrightChartSource:
     def extract_points(self) -> list[ExportPoint]:
         page = self._active_page
         page.wait_for_timeout(SETTLE_DELAY)
-        extraction = page.evaluate(EXTRACTION_SCRIPT, TARGET_SECTION_ID)
+        extraction = self._chart().evaluate(EXTRACTION_SCRIPT)
 
         candidate_count = int(extraction["candidateCount"])
         rows = extraction["rows"]
