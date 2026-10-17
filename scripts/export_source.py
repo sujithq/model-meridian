@@ -24,18 +24,25 @@ DIALOG_TIMEOUT = 60000
 SETTLE_DELAY = 6000
 VIEWPORT = {"width": 1600, "height": 1200}
 
+# The site has rendered the same section ID in several tab panels; only the
+# visible copy is the one the user (and the selector dialog) interacts with.
+_FIND_VISIBLE_CHART = """
+  const chart = [...document.querySelectorAll('#' + CSS.escape(sectionId))]
+    .find((node) => node.getClientRects().length > 0) || null;
+"""
+
 SELECTION_COMPLETE_SCRIPT = """
-(chart) => {
+(sectionId) => {""" + _FIND_VISIBLE_CHART + """
   const selector = chart?.querySelector('button[role="combobox"]');
   if (!selector) return false;
   const text = (selector.textContent || '').trim();
-  const match = text.match(/^(\\d+) of (\\d+) (?:models|releases)$/);
+  const match = text.match(/^(\\d+) of (\\d+) (?:releases|models)$/);
   return !!match && match[1] === match[2];
 }
 """
 
 EXTRACTION_SCRIPT = """
-(chart) => {
+(sectionId) => {""" + _FIND_VISIBLE_CHART + """
   if (!chart) return { candidateCount: 0, rows: [] };
   const candidates = [
     ...chart.querySelectorAll(
@@ -80,7 +87,8 @@ EXTRACTION_SCRIPT = """
     if (!id || seen.has(id)) continue;
     seen.add(id);
 
-    // The default variant's `label` omits its effort suffix; the tooltip keeps it.
+    // A release's labelled point carries only the release name in `label`;
+    // `tooltipLabel` keeps the full variant name with its effort suffix.
     const label = payload.tooltipLabel || payload.label || payload.model || '';
     const url = payload.url || '';
     const href = url
@@ -158,16 +166,12 @@ class PlaywrightChartSource:
         return self._page
 
     def _chart(self):
-        return self._active_page.get_by_text(TARGET_TITLE, exact=True).locator(
-            "xpath=ancestor::*[.//*[local-name()='svg' and "
-            "contains(concat(' ', normalize-space(@class), ' '), "
-            "' recharts-surface ')]][1]"
-        )
+        return self._active_page.locator(f"#{TARGET_SECTION_ID}").filter(visible=True)
 
     def _open_chart(self) -> None:
         page = self._active_page
         page.goto(
-            SITE_URL,
+            f"{SITE_URL}#{TARGET_SECTION_ID}",
             wait_until="domcontentloaded",
             timeout=self._timeout,
         )
@@ -194,26 +198,27 @@ class PlaywrightChartSource:
             )
         select_all.click()
 
-        # The release selector applies changes immediately; older selectors need Save.
+        # The release selector applies changes immediately and has no Save control.
         save = dialog.get_by_role("button", name="Save")
+        if save.count() > 1:
+            raise RuntimeError(f"Expected at most one Save control, found {save.count()}.")
         if save.count() == 1:
             save.click()
-        elif save.count() > 1:
-            raise RuntimeError(f"Expected at most one Save control, found {save.count()}.")
 
         page.wait_for_function(
             SELECTION_COMPLETE_SCRIPT,
-            arg=self._chart().element_handle(),
+            arg=TARGET_SECTION_ID,
             timeout=self._timeout,
         )
         if dialog.is_visible():
             page.keyboard.press("Escape")
+            dialog.wait_for(state="hidden", timeout=DIALOG_TIMEOUT)
         return int(selector.inner_text().strip().split()[0])
 
     def extract_points(self) -> list[ExportPoint]:
         page = self._active_page
         page.wait_for_timeout(SETTLE_DELAY)
-        extraction = self._chart().evaluate(EXTRACTION_SCRIPT)
+        extraction = page.evaluate(EXTRACTION_SCRIPT, TARGET_SECTION_ID)
 
         candidate_count = int(extraction["candidateCount"])
         rows = extraction["rows"]

@@ -208,7 +208,7 @@ class ModelSourceBoundaryTests(unittest.TestCase):
     def test_page_timeout_allows_slow_chart_rendering(self) -> None:
         from export_source import PAGE_TIMEOUT
 
-        self.assertEqual(PAGE_TIMEOUT, 300_000)
+        self.assertGreaterEqual(PAGE_TIMEOUT, 300_000)
 
     @unittest.skipUnless(
         importlib.util.find_spec("playwright"), "playwright is not installed"
