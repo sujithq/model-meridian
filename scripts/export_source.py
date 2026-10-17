@@ -18,9 +18,9 @@ SITE_URL = "https://artificialanalysis.ai/models/releases"
 TARGET_TITLE = "Intelligence Index vs. Cost per Intelligence Index Task"
 OUTPUT_SLUG = "artificial-analysis-intelligence-index-vs-cost-all-plotted-models"
 
-PAGE_TIMEOUT = 300000
-DIALOG_TIMEOUT = 30000
-SETTLE_DELAY = 3000
+PAGE_TIMEOUT = 600000
+DIALOG_TIMEOUT = 60000
+SETTLE_DELAY = 6000
 VIEWPORT = {"width": 1600, "height": 1200}
 
 SELECTION_COMPLETE_SCRIPT = """
