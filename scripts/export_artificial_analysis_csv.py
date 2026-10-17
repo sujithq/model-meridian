@@ -23,7 +23,7 @@ def parse_args(argv: list[str] | None = None) -> ExportOptions:
     parser = argparse.ArgumentParser(
         description=(
             "Export all plotted Artificial Analysis model points from the "
-            "Intelligence Index vs. Cost per Intelligence Index Task chart."
+            "Intelligence Index vs. Cost per Task, by Model Release chart."
         )
     )
     parser.add_argument(

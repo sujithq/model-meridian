@@ -14,9 +14,9 @@ from playwright.sync_api import sync_playwright
 
 from export_pipeline import ExportPoint, SourceMetadata
 
-SITE_URL = "https://artificialanalysis.ai/models"
-TARGET_SECTION_ID = "intelligence-index-vs-cost-per-intelligence-index-task"
-TARGET_TITLE = "Intelligence Index vs. Cost per Intelligence Index Task"
+SITE_URL = "https://artificialanalysis.ai/"
+TARGET_SECTION_ID = "intelligence-index-vs-cost-per-task-by-model-release"
+TARGET_TITLE = "Intelligence Index vs. Cost per Task, by Model Release"
 OUTPUT_SLUG = "artificial-analysis-intelligence-index-vs-cost-all-plotted-models"
 
 PAGE_TIMEOUT = 120000
@@ -30,7 +30,7 @@ SELECTION_COMPLETE_SCRIPT = """
   const selector = chart?.querySelector('button[role="combobox"]');
   if (!selector) return false;
   const text = (selector.textContent || '').trim();
-  const match = text.match(/^(\\d+) of (\\d+) models$/);
+  const match = text.match(/^(\\d+) of (\\d+) (?:models|releases)$/);
   return !!match && match[1] === match[2];
 }
 """
@@ -82,7 +82,8 @@ EXTRACTION_SCRIPT = """
     if (!id || seen.has(id)) continue;
     seen.add(id);
 
-    const label = payload.label || payload.model || '';
+    // The default variant's `label` omits its effort suffix; the tooltip keeps it.
+    const label = payload.tooltipLabel || payload.label || payload.model || '';
     const url = payload.url || '';
     const href = url
       ? (url.startsWith('http://') || url.startsWith('https://')
@@ -191,16 +192,20 @@ class PlaywrightChartSource:
             )
         select_all.click()
 
+        # The release selector applies changes immediately; older selectors need Save.
         save = dialog.get_by_role("button", name="Save")
-        if save.count() != 1:
-            raise RuntimeError(f"Expected one Save control, found {save.count()}.")
-        save.click()
+        if save.count() == 1:
+            save.click()
+        elif save.count() > 1:
+            raise RuntimeError(f"Expected at most one Save control, found {save.count()}.")
 
         page.wait_for_function(
             SELECTION_COMPLETE_SCRIPT,
             arg=TARGET_SECTION_ID,
             timeout=self._timeout,
         )
+        if dialog.is_visible():
+            page.keyboard.press("Escape")
         return int(selector.inner_text().strip().split()[0])
 
     def extract_points(self) -> list[ExportPoint]:
