@@ -89,7 +89,9 @@ embedding.
 ## Data source
 
 Model and benchmark data originates from
-[Artificial Analysis](https://artificialanalysis.ai/models). Model Meridian is
+[Artificial Analysis](https://artificialanalysis.ai/models/releases), using the
+“Intelligence Index vs. Cost per Intelligence Index Task” chart. The exporter
+locates the chart by its title rather than relying on its section ID. Model Meridian is
 an independent visualization and is not affiliated with the original source.
 
 ## Requirements
