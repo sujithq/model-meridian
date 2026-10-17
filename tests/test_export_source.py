@@ -1,131 +1,160 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest import mock
 
-from tests.helpers import SCRIPTS
+import tests.helpers  # noqa: F401  (puts scripts/ on sys.path)
+
+PLAYWRIGHT_AVAILABLE = importlib.util.find_spec("playwright") is not None
+
+if PLAYWRIGHT_AVAILABLE:
+    import export_source
 
 
-@unittest.skipUnless(
-    importlib.util.find_spec("playwright"), "playwright is not installed"
-)
-class ChartDiscoveryTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        from playwright.sync_api import sync_playwright
+def chromium_available() -> bool:
+    if not PLAYWRIGHT_AVAILABLE:
+        return False
+    from playwright.sync_api import sync_playwright
 
-        cls.playwright = sync_playwright().start()
-        if not Path(cls.playwright.chromium.executable_path).exists():
-            cls.playwright.stop()
-            raise unittest.SkipTest("Playwright Chromium is not installed")
-        cls.browser = cls.playwright.chromium.launch()
+    try:
+        with sync_playwright() as playwright:
+            playwright.chromium.launch(headless=True).close()
+    except Exception:
+        return False
+    return True
 
-    @classmethod
-    def tearDownClass(cls) -> None:
-        cls.browser.close()
-        cls.playwright.stop()
 
-    def setUp(self) -> None:
-        from export_source import PlaywrightChartSource
+POINTS = [
+    {
+        "id": "release-default",
+        "x": 1.5,
+        "y": 60.0,
+        "label": "Alpha 2",
+        "tooltipLabel": "Alpha 2 (max)",
+        "color": "#111111",
+        "url": "/models/releases/alpha-2",
+    },
+    {
+        "id": "release-variant",
+        "x": 0.5,
+        "y": 55.0,
+        "label": "Alpha 2 (low)",
+        "tooltipLabel": None,
+        "color": "#111111",
+        "url": "/models/releases/alpha-2",
+    },
+    {
+        "id": "other-release",
+        "x": 0.25,
+        "y": 40.0,
+        "label": "Beta",
+        "tooltipLabel": "Beta",
+        "color": "#222222",
+        "url": "https://example.test/beta",
+    },
+]
 
-        self.page = self.browser.new_page()
-        self.addCleanup(self.page.close)
-        self.source = PlaywrightChartSource(timeout=1000)
-        self.source._page = self.page
 
-    def load_chart(self, section_id: str) -> None:
-        from export_source import SITE_URL, TARGET_TITLE
+def fixture_html(section_id: str, title: str) -> str:
+    """A release chart whose selector applies immediately and has no Save button.
 
-        html = f"""
-            <section id="intelligence-index-vs-cost-per-intelligence-index-task">
-              <h2>Another chart</h2>
-              <button role="combobox">1 of 9 models</button>
-              <svg class="recharts-surface"><circle data-chart-item-id="other"/></svg>
-            </section>
-            <section {section_id}>
-              <header><h2>{TARGET_TITLE}<svg></svg></h2></header>
-              <button role="combobox" onclick="document.querySelector('dialog').showModal()">
-                1 of 2 models
-              </button>
-              <svg class="recharts-surface" width="100" height="100">
-                <circle data-chart-item-id="target" cx="20" cy="20" r="5"/>
-              </svg>
-            </section>
-            <dialog>
-              <button onclick="window.allSelected = true">Select all</button>
-              <button onclick="
-                if (window.allSelected) {{
-                  setTimeout(() => {{
-                    document.querySelectorAll('button[role=combobox]')[1].textContent =
-                      '2 of 2 models';
-                  }}, 20);
-                }}
-                document.querySelector('dialog').close();
-              ">Save</button>
-            </dialog>
-            <script>
-              for (const circle of document.querySelectorAll('circle')) {{
-                const id = circle.getAttribute('data-chart-item-id');
-                circle.__reactFiber$fixture = {{
-                  memoizedProps: {{
-                    payload: {{id, label: id, x: 1.25, y: 50,
-                               url: '/models/' + id, color: '#123456'}}
-                  }}
-                }};
-              }}
-            </script>
-        """
-        self.page.route(
-            SITE_URL,
-            lambda route: route.fulfill(body=html, content_type="text/html"),
-        )
-        self.source._open_chart()
+    A hidden copy of the section with the same ID precedes the visible one, as
+    the site has rendered duplicate tab panels before.
+    """
+    return f"""<!doctype html>
+<html><body>
+<div id="{section_id}" style="display:none">
+  <h2>{title}</h2>
+  <button role="combobox">1 of 1 releases</button>
+  <svg class="recharts-surface"><circle data-chart-item-id="stale" r="3"></circle></svg>
+</div>
+<div id="{section_id}">
+  <h2>{title}</h2>
+  <button role="combobox" id="selector">1 of 2 releases</button>
+  <svg class="recharts-surface" id="plot" width="400" height="300"></svg>
+</div>
+<script>
+const points = {json.dumps(POINTS)};
+const visible = document.querySelectorAll('[id="{section_id}"]')[1];
+const selector = visible.querySelector('#selector');
+const plot = visible.querySelector('#plot');
+function render(count) {{
+  plot.innerHTML = '';
+  for (const payload of points.slice(0, count)) {{
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('data-chart-item-id', payload.id);
+    circle.setAttribute('r', '3');
+    circle['__reactFiber$fixture'] = {{
+      memoizedProps: {{}},
+      return: {{ memoizedProps: {{ payload }}, return: null }},
+    }};
+    plot.appendChild(circle);
+  }}
+}}
+render(1);
+selector.addEventListener('click', () => {{
+  const dialog = document.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  for (const name of ['Clear', 'Select all', 'Reset (to default)']) {{
+    const button = document.createElement('button');
+    button.textContent = name;
+    dialog.appendChild(button);
+  }}
+  dialog.children[1].addEventListener('click', () => {{
+    setTimeout(() => {{
+      selector.textContent = '2 of 2 releases';
+      render(points.length);
+    }}, 100);
+  }});
+  document.addEventListener('keydown', function close(event) {{
+    if (event.key === 'Escape') {{
+      dialog.remove();
+      document.removeEventListener('keydown', close);
+    }}
+  }});
+  document.body.appendChild(dialog);
+}});
+</script>
+</body></html>
+"""
+
+
+@unittest.skipUnless(chromium_available(), "Playwright Chromium is not installed")
+class PlaywrightChartSourceFixtureTests(unittest.TestCase):
+    def test_selects_all_releases_and_extracts_full_variant_names(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            page.write_text(
+                fixture_html(export_source.TARGET_SECTION_ID, export_source.TARGET_TITLE),
+                encoding="utf-8",
+            )
+            with mock.patch.object(export_source, "SITE_URL", page.as_uri()), mock.patch.object(
+                export_source, "SETTLE_DELAY", 0
+            ):
+                with export_source.PlaywrightChartSource(timeout=15000) as source:
+                    selected = source.select_all()
+                    points = source.extract_points()
+
+        self.assertEqual(selected, 2)
         self.assertEqual(
-            self.page.url, "https://artificialanalysis.ai/models/releases"
+            [(point.id, point.model) for point in points],
+            [
+                ("release-default", "Alpha 2 (max)"),
+                ("release-variant", "Alpha 2 (low)"),
+                ("other-release", "Beta"),
+            ],
         )
-
-    def test_changed_or_missing_id_keeps_selection_and_extraction_scoped(self) -> None:
-        from export_source import SITE_URL, TARGET_TITLE
-
-        for section_id in ('id="renamed-chart"', ""):
-            with self.subTest(section_id=section_id):
-                self.load_chart(section_id)
-                self.assertEqual(self.source.select_all(), 2)
-                with patch("export_source.SETTLE_DELAY", 0):
-                    points = self.source.extract_points()
-                self.assertEqual([point.id for point in points], ["target"])
-                self.assertEqual(points[0].cost_per_task_usd, 1.25)
-                self.assertEqual(points[0].intelligence_index, 50)
-                self.assertEqual(
-                    points[0].model_url,
-                    "https://artificialanalysis.ai/models/target",
-                )
-                self.assertEqual(points[0].color, "#123456")
-                self.assertEqual(self.source.metadata.page, SITE_URL)
-                self.assertEqual(self.source.metadata.chart, TARGET_TITLE)
-                self.assertEqual(
-                    self.page.locator('button[role="combobox"]').first.inner_text(),
-                    "1 of 9 models",
-                )
-                self.page.unroute_all()
-
-    def test_missing_title_does_not_use_the_old_section_id(self) -> None:
-        from playwright.sync_api import TimeoutError
-
-        from export_source import SITE_URL
-
-        self.page.route(
-            SITE_URL,
-            lambda route: route.fulfill(
-                body='<section id="intelligence-index-vs-cost-per-intelligence-index-task">'
-                '<svg class="recharts-surface"></svg></section>',
-                content_type="text/html",
-            ),
+        self.assertEqual(
+            points[0].model_url, "https://artificialanalysis.ai/models/releases/alpha-2"
         )
-        with self.assertRaises(TimeoutError):
-            self.source._open_chart()
+        self.assertEqual(points[2].model_url, "https://example.test/beta")
+        self.assertEqual(points[0].cost_per_task_usd, 1.5)
+        self.assertEqual(points[0].intelligence_index, 60.0)
+        self.assertEqual(points[0].color, "#111111")
 
 
 if __name__ == "__main__":

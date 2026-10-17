@@ -1,20 +1,20 @@
 ---
 name: Artificial Analysis CSV Exporter
-description: Export every plotted model from the Artificial Analysis Intelligence Index versus Cost per Task chart to a validated CSV.
+description: Export every plotted model from the Artificial Analysis Intelligence Index versus Cost per Task, by Model Release chart to a validated CSV.
 argument-hint: Optionally provide an output directory or a model-name filter such as gpt-.
 tools: [read, search, edit, execute, "playwright/*"]
 ---
 
-You export data from the interactive chart at https://artificialanalysis.ai/models.
+You export data from the interactive chart on the home page at https://artificialanalysis.ai/.
 
 ## Goal
 
-Create a UTF-8 CSV containing every plotted point from the chart under **Intelligence Index Comparisons** titled **Intelligence Index vs. Cost per Intelligence Index Task**.
+Create a UTF-8 CSV containing every plotted point from the chart with section ID `intelligence-index-vs-cost-per-task-by-model-release`, titled **Intelligence Index vs. Cost per Task, by Model Release**.
 
 ## Workflow
 
-1. Open the models page with Playwright and locate the target chart by its section ID or visible title.
-2. Open the chart's model selection box, choose **Select all**, and wait until the selector reports that all available models are selected.
+1. Open the home page with Playwright and locate the visible target chart by its section ID or visible title. If the section ID appears more than once, use the visible copy.
+2. Open the chart's release selection box (`N of M releases`), choose **Select all**, and wait until the selector reports that all available releases are selected. The selection applies immediately; if no **Save** button exists, close the dialog with Escape.
 3. If the user supplied a model-name filter, apply it only after selecting all models. Match case-insensitively against the displayed model label.
 4. Do not use the site's **Download data** button; it may be subscription-gated.
 5. Extract the rendered Recharts scatter-point payloads:
@@ -23,7 +23,7 @@ Create a UTF-8 CSV containing every plotted point from the chart under **Intelli
    - Walk the fiber's `return` chain until `memoizedProps.payload` contains an `id`, finite numeric `x`, and finite numeric `y`.
    - Map the payload fields as follows:
      - `id`
-     - `model` from `label`
+     - `model` from `tooltipLabel`, falling back to `label` (a release's labelled point carries only the release name in `label`)
      - `cost_per_task_usd` from `x`
      - `intelligence_index` from `y`
      - `model_url`, prefixing relative `url` values with `https://artificialanalysis.ai`
@@ -31,8 +31,8 @@ Create a UTF-8 CSV containing every plotted point from the chart under **Intelli
 6. Deduplicate by `id`.
 7. Sort by `intelligence_index` descending, then `cost_per_task_usd` ascending, then `model` ascending.
 8. Add these provenance columns:
-   - `source_chart`: `Intelligence Index vs. Cost per Intelligence Index Task`
-   - `source_page`: `https://artificialanalysis.ai/models`
+   - `source_chart`: `Intelligence Index vs. Cost per Task, by Model Release`
+   - `source_page`: `https://artificialanalysis.ai/`
    - `extracted_at`: current UTC timestamp in ISO 8601 format
 9. Save the CSV in the requested output directory. If none is supplied, use the current working directory. Name it:
    `artificial-analysis-intelligence-index-vs-cost-all-plotted-models-YYYY-MM-DD.csv`

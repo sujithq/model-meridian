@@ -88,10 +88,11 @@ embedding.
 
 ## Data source
 
-Model and benchmark data originates from
-[Artificial Analysis](https://artificialanalysis.ai/models/releases), using the
-“Intelligence Index vs. Cost per Intelligence Index Task” chart. The exporter
-locates the chart by its title rather than relying on its section ID. Model Meridian is
+Model and benchmark data originates from the **Intelligence Index vs. Cost per
+Task, by Model Release** chart on the
+[Artificial Analysis](https://artificialanalysis.ai/#intelligence-index-vs-cost-per-task-by-model-release)
+home page. The export selects every release and records each plotted
+reasoning/effort variant as its own row. Model Meridian is
 an independent visualization and is not affiliated with the original source.
 
 ## Requirements
@@ -128,7 +129,10 @@ python -m unittest discover -s tests -v
 The tests cover model parsing, CSV loading and filtering, series ordering and
 color assignment, interactive-page payload and self-contained output, static
 PNG generation, export sorting and CSV validation, and the export pipeline
-driven by an in-memory stand-in for the browser source.
+driven by an in-memory stand-in for the browser source. When Playwright's
+Chromium is installed (`python -m playwright install chromium`), a local HTML
+fixture also exercises the browser source's release selection and extraction;
+otherwise that test is skipped.
 
 ## Contributing and security
 
