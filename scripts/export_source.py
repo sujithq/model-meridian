@@ -27,8 +27,23 @@ VIEWPORT = {"width": 1600, "height": 1200}
 # The site has rendered the same section ID in several tab panels; only the
 # visible copy is the one the user (and the selector dialog) interacts with.
 _FIND_VISIBLE_CHART = """
-  const chart = [...document.querySelectorAll('#' + CSS.escape(sectionId))]
+  let chart = [...document.querySelectorAll('#' + CSS.escape(sectionId))]
     .find((node) => node.getClientRects().length > 0) || null;
+  if (!chart) {
+    const targetTitle = """ + repr(TARGET_TITLE) + """;
+    const title = [...document.querySelectorAll('body *')]
+      .find((node) =>
+        node.getClientRects().length > 0 &&
+        node.textContent.trim() === targetTitle
+      );
+    for (let ancestor = title?.parentElement; ancestor && ancestor !== document.body;
+      ancestor = ancestor.parentElement) {
+      if (ancestor.querySelector('button[role="combobox"]')) {
+        chart = ancestor;
+        break;
+      }
+    }
+  }
 """
 
 SELECTION_COMPLETE_SCRIPT = """
@@ -166,7 +181,15 @@ class PlaywrightChartSource:
         return self._page
 
     def _chart(self):
-        return self._active_page.locator(f"#{TARGET_SECTION_ID}").filter(visible=True)
+        page = self._active_page
+        chart = page.locator(f"#{TARGET_SECTION_ID}").filter(visible=True)
+        if chart.count():
+            return chart
+
+        title = page.get_by_text(TARGET_TITLE, exact=True).filter(visible=True)
+        return title.locator(
+            "xpath=ancestor::*[.//button[@role='combobox']][1]"
+        )
 
     def _open_chart(self) -> None:
         page = self._active_page

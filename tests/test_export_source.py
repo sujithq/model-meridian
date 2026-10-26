@@ -156,6 +156,24 @@ class PlaywrightChartSourceFixtureTests(unittest.TestCase):
         self.assertEqual(points[0].intelligence_index, 60.0)
         self.assertEqual(points[0].color, "#111111")
 
+    def test_finds_chart_by_title_when_section_id_changes(self) -> None:
+        changed_section_id = "updated-chart-section"
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            page.write_text(
+                fixture_html(changed_section_id, export_source.TARGET_TITLE),
+                encoding="utf-8",
+            )
+            with mock.patch.object(export_source, "SITE_URL", page.as_uri()), mock.patch.object(
+                export_source, "SETTLE_DELAY", 0
+            ):
+                with export_source.PlaywrightChartSource(timeout=15000) as source:
+                    selected = source.select_all()
+                    points = source.extract_points()
+
+        self.assertEqual(selected, 2)
+        self.assertEqual(len(points), 3)
+
 
 if __name__ == "__main__":
     unittest.main()
