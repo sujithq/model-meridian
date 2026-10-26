@@ -13,13 +13,13 @@ Create a UTF-8 CSV containing every plotted point from the chart with section ID
 
 ## Workflow
 
-1. Open the home page with Playwright and locate the visible target chart by its section ID or visible title. If the section ID appears more than once, use the visible copy.
+1. Open `https://artificialanalysis.ai/#intelligence-efficiency-tabs` with Playwright and locate the visible target chart by its section ID or visible title. If the section ID appears more than once, use the visible copy.
 2. Open the chart's release selection box (`N of M releases`), choose **Select all**, and wait until the selector reports that all available releases are selected. The selection applies immediately; if no **Save** button exists, close the dialog with Escape.
 3. If the user supplied a model-name filter, apply it only after selecting all models. Match case-insensitively against the displayed model label.
 4. Do not use the site's **Download data** button; it may be subscription-gated.
 5. Extract the rendered Recharts scatter-point payloads:
-   - Find `svg.recharts-surface circle[data-chart-item-id]` within the target chart.
-   - For each circle, locate its React fiber key whose name starts with `__reactFiber$`.
+   - Inspect descendants of `svg.recharts-surface` within the target chart.
+   - For each SVG descendant, locate its React fiber key whose name starts with `__reactFiber$`.
    - Walk the fiber's `return` chain until `memoizedProps.payload` contains an `id`, finite numeric `x`, and finite numeric `y`.
    - Map the payload fields as follows:
      - `id`
