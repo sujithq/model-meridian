@@ -90,7 +90,7 @@ embedding.
 
 Model and benchmark data originates from the **Intelligence Index vs. Cost per
 Task, by Model Release** chart on the
-[Artificial Analysis](https://artificialanalysis.ai/#intelligence-index-vs-cost-per-task-by-model-release)
+[Artificial Analysis](https://artificialanalysis.ai/#intelligence-efficiency-tabs)
 home page. The export selects every release and records each plotted
 reasoning/effort variant as its own row. Model Meridian is
 an independent visualization and is not affiliated with the original source.

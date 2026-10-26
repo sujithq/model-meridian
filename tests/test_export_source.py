@@ -174,6 +174,32 @@ class PlaywrightChartSourceFixtureTests(unittest.TestCase):
         self.assertEqual(selected, 2)
         self.assertEqual(len(points), 3)
 
+    def test_extracts_payloads_when_chart_points_have_no_data_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            html = fixture_html(export_source.TARGET_SECTION_ID, export_source.TARGET_TITLE)
+            html = html.replace(
+                "circle.setAttribute('data-chart-item-id', payload.id);",
+                "",
+            )
+            page.write_text(html, encoding="utf-8")
+            with mock.patch.object(export_source, "SITE_URL", page.as_uri()), mock.patch.object(
+                export_source, "SETTLE_DELAY", 0
+            ):
+                with export_source.PlaywrightChartSource(timeout=15000) as source:
+                    selected = source.select_all()
+                    points = source.extract_points()
+
+        self.assertEqual(selected, 2)
+        self.assertEqual(
+            [(point.id, point.model) for point in points],
+            [
+                ("release-default", "Alpha 2 (max)"),
+                ("release-variant", "Alpha 2 (low)"),
+                ("other-release", "Beta"),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

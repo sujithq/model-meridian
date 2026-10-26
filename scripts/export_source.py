@@ -15,6 +15,7 @@ from playwright.sync_api import sync_playwright
 from export_pipeline import ExportPoint, SourceMetadata
 
 SITE_URL = "https://artificialanalysis.ai/"
+TARGET_TAB_ID = "intelligence-efficiency-tabs"
 TARGET_SECTION_ID = "intelligence-index-vs-cost-per-task-by-model-release"
 TARGET_TITLE = "Intelligence Index vs. Cost per Task, by Model Release"
 OUTPUT_SLUG = "artificial-analysis-intelligence-index-vs-cost-all-plotted-models"
@@ -58,14 +59,16 @@ SELECTION_COMPLETE_SCRIPT = """
 
 EXTRACTION_SCRIPT = """
 (sectionId) => {""" + _FIND_VISIBLE_CHART + """
-  if (!chart) return { candidateCount: 0, rows: [] };
-  const candidates = [
-    ...chart.querySelectorAll(
-      'svg.recharts-surface circle[data-chart-item-id]'
-    ),
-  ];
+  if (!chart) {
+    return { candidateCount: 0, resolvedCandidateCount: 0, rows: [] };
+  }
+  const candidates = [...chart.querySelectorAll('svg.recharts-surface *')];
+  const markedCandidates = candidates.filter((node) =>
+    node.hasAttribute('data-chart-item-id')
+  );
   const rows = [];
   const seen = new Set();
+  const resolvedMarkedCandidates = new Set();
 
   const findFiber = (node) => {
     if (!node) return null;
@@ -98,6 +101,9 @@ EXTRACTION_SCRIPT = """
     const payload = walkPayload(fiber);
     if (!payload) continue;
 
+    if (candidate.hasAttribute('data-chart-item-id')) {
+      resolvedMarkedCandidates.add(candidate);
+    }
     const id = String(payload.id).trim();
     if (!id || seen.has(id)) continue;
     seen.add(id);
@@ -121,7 +127,11 @@ EXTRACTION_SCRIPT = """
       color: payload.color || '',
     });
   }
-  return { candidateCount: candidates.length, rows };
+  return {
+    candidateCount: markedCandidates.length,
+    resolvedCandidateCount: resolvedMarkedCandidates.size,
+    rows,
+  };
 }
 """
 
@@ -194,7 +204,7 @@ class PlaywrightChartSource:
     def _open_chart(self) -> None:
         page = self._active_page
         page.goto(
-            f"{SITE_URL}#{TARGET_SECTION_ID}",
+            f"{SITE_URL}#{TARGET_TAB_ID}",
             wait_until="domcontentloaded",
             timeout=self._timeout,
         )
@@ -244,11 +254,13 @@ class PlaywrightChartSource:
         extraction = page.evaluate(EXTRACTION_SCRIPT, TARGET_SECTION_ID)
 
         candidate_count = int(extraction["candidateCount"])
+        resolved_candidate_count = int(extraction["resolvedCandidateCount"])
         rows = extraction["rows"]
-        if candidate_count != len(rows):
+        if candidate_count != resolved_candidate_count:
             raise RuntimeError(
                 "Chart extraction was incomplete: "
-                f"{candidate_count} rendered points produced {len(rows)} unique payloads."
+                f"{candidate_count} marked points produced "
+                f"{resolved_candidate_count} valid payloads."
             )
         return [
             ExportPoint(
