@@ -174,6 +174,45 @@ class PlaywrightChartSourceFixtureTests(unittest.TestCase):
         self.assertEqual(selected, 2)
         self.assertEqual(len(points), 3)
 
+    def test_finds_chart_by_legacy_section_id(self) -> None:
+        legacy_id = export_source.LEGACY_SECTION_IDS[0]
+        self.assertNotEqual(legacy_id, export_source.TARGET_SECTION_ID)
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            page.write_text(
+                fixture_html(legacy_id, export_source.TARGET_TITLE),
+                encoding="utf-8",
+            )
+            with mock.patch.object(export_source, "SITE_URL", page.as_uri()), mock.patch.object(
+                export_source, "SETTLE_DELAY", 0
+            ):
+                with export_source.PlaywrightChartSource(timeout=15000) as source:
+                    selected = source.select_all()
+                    points = source.extract_points()
+
+        self.assertEqual(selected, 2)
+        self.assertEqual(len(points), 3)
+
+    def test_title_fallback_skips_containers_without_a_plot(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            html = fixture_html("updated-chart-section", export_source.TARGET_TITLE)
+            decoy = (
+                f"<div><h3>{export_source.TARGET_TITLE}</h3>"
+                "<button role=\"combobox\">Sort</button></div>\n"
+            )
+            html = html.replace("<html><body>\n", "<html><body>\n" + decoy, 1)
+            page.write_text(html, encoding="utf-8")
+            with mock.patch.object(export_source, "SITE_URL", page.as_uri()), mock.patch.object(
+                export_source, "SETTLE_DELAY", 0
+            ):
+                with export_source.PlaywrightChartSource(timeout=15000) as source:
+                    selected = source.select_all()
+                    points = source.extract_points()
+
+        self.assertEqual(selected, 2)
+        self.assertEqual(len(points), 3)
+
     def test_extracts_payloads_when_chart_points_have_no_data_marker(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             page = Path(directory) / "index.html"

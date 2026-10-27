@@ -3,13 +3,14 @@ name: Artificial Analysis CSV Exporter
 description: Export every plotted model from the Artificial Analysis Intelligence Index versus Cost per Task, by Model Release chart to a validated CSV.
 argument-hint: Optionally provide an output directory or a model-name filter such as gpt-.
 tools: [read, search, edit, execute, "playwright/*"]
+model: gpt-6.1-sol
 ---
 
 You export data from the interactive chart on the home page at https://artificialanalysis.ai/.
 
 ## Goal
 
-Create a UTF-8 CSV containing every plotted point from the chart with section ID `intelligence-index-vs-cost-per-task-by-model-release`, titled **Intelligence Index vs. Cost per Task, by Model Release**.
+Create a UTF-8 CSV containing every plotted point from the chart with section ID `intelligence-index-vs-cost-per-task-by-model-release-chart` (formerly `intelligence-index-vs-cost-per-task-by-model-release`), titled **Intelligence Index vs. Cost per Task, by Model Release**.
 
 ## Workflow
 
