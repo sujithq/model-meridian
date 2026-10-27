@@ -3,3 +3,4 @@ src/index.html
 __pycache__/
 *.py[cod]
 node_modules/
+.npmrc

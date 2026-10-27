@@ -112,13 +112,34 @@ python -m pip install -r requirements.txt
 python -m playwright install --with-deps chromium
 ```
 
-Python packages use the Microsoft PyPI proxy configured in `requirements.txt`
-(`https://packagefeedproxy.microsoft.io/pypi/simple`). The Playwright minimum is
-1.64.0, available from that feed. npm uses the Microsoft registry in `.npmrc`
-(`https://packagefeedproxy.microsoft.io/npm/`); existing lockfile download URLs
-also use that proxy, without changing pinned dependency versions or integrity hashes.
-Do not fall back to public package indexes. This repository has no NuGet
-dependencies.
+GitHub-hosted workflows use the standard public PyPI and npm registries.
+`requirements.txt` does not override the package index, and the npm lockfile
+uses public registry URLs with pinned dependency versions and integrity hashes.
+
+On Microsoft-managed devices that require package proxies, create a local
+`.npmrc` in the repository root:
+
+```ini
+registry=https://packagefeedproxy.microsoft.io/npm/
+```
+
+npm reads this file automatically, including when installing the public URLs
+in the lockfile. `.npmrc` is ignored by Git, so a clean GitHub checkout has no
+local override and uses the public npm registry. No machine detection or
+workflow-specific switch is needed.
+
+Python does not read `.npmrc`. pip uses the device's existing configuration,
+or an override set only in the local PowerShell session:
+
+```powershell
+$env:PIP_INDEX_URL = "https://packagefeedproxy.microsoft.io/pypi/simple"
+```
+
+`npm config get registry` and `python -m pip config debug` show which local
+configuration is active. Neither local configuration nor session environment
+variables are inherited by GitHub-hosted runners. If a local mirror lacks a
+required version, wait for it to be mirrored rather than lowering the
+repository's dependency requirements. This repository has no NuGet dependencies.
 
 The compiled Tailwind asset is committed, so normal page generation does not
 require Node.js. After changing `theme_sources/tailwind.css` or its pinned
