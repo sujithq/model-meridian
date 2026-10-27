@@ -16,7 +16,10 @@ from export_pipeline import ExportPoint, SourceMetadata
 
 SITE_URL = "https://artificialanalysis.ai/"
 TARGET_TAB_ID = "intelligence-efficiency-tabs"
-TARGET_SECTION_ID = "intelligence-index-vs-cost-per-task-by-model-release"
+TARGET_SECTION_ID = "intelligence-index-vs-cost-per-task-by-model-release-chart"
+# Earlier section IDs, tried after the current one so a revert keeps working.
+LEGACY_SECTION_IDS = ("intelligence-index-vs-cost-per-task-by-model-release",)
+SECTION_IDS = (TARGET_SECTION_ID, *LEGACY_SECTION_IDS)
 TARGET_TITLE = "Intelligence Index vs. Cost per Task, by Model Release"
 OUTPUT_SLUG = "artificial-analysis-intelligence-index-vs-cost-all-plotted-models"
 
@@ -27,28 +30,40 @@ VIEWPORT = {"width": 1600, "height": 1200}
 
 # The site has rendered the same section ID in several tab panels; only the
 # visible copy is the one the user (and the selector dialog) interacts with.
+# The title fallback only accepts a container holding both the selector and the
+# plot, so a heading inside a broader layout cannot resolve to a plotless node.
 _FIND_VISIBLE_CHART = """
-  let chart = [...document.querySelectorAll('#' + CSS.escape(sectionId))]
-    .find((node) => node.getClientRects().length > 0) || null;
+  let chart = null;
+  for (const sectionId of sectionIds) {
+    chart = [...document.querySelectorAll('#' + CSS.escape(sectionId))]
+      .find((node) => node.getClientRects().length > 0) || null;
+    if (chart) break;
+  }
   if (!chart) {
     const targetTitle = """ + repr(TARGET_TITLE) + """;
-    const title = [...document.querySelectorAll('body *')]
-      .find((node) =>
+    const titles = [...document.querySelectorAll('body *')]
+      .filter((node) =>
         node.getClientRects().length > 0 &&
         node.textContent.trim() === targetTitle
       );
-    for (let ancestor = title?.parentElement; ancestor && ancestor !== document.body;
-      ancestor = ancestor.parentElement) {
-      if (ancestor.querySelector('button[role="combobox"]')) {
-        chart = ancestor;
-        break;
+    for (const title of titles) {
+      for (let ancestor = title.parentElement; ancestor && ancestor !== document.body;
+        ancestor = ancestor.parentElement) {
+        if (
+          ancestor.querySelector('button[role="combobox"]') &&
+          ancestor.querySelector('svg.recharts-surface')
+        ) {
+          chart = ancestor;
+          break;
+        }
       }
+      if (chart) break;
     }
   }
 """
 
 SELECTION_COMPLETE_SCRIPT = """
-(sectionId) => {""" + _FIND_VISIBLE_CHART + """
+(sectionIds) => {""" + _FIND_VISIBLE_CHART + """
   const selector = chart?.querySelector('button[role="combobox"]');
   if (!selector) return false;
   const text = (selector.textContent || '').trim();
@@ -58,7 +73,7 @@ SELECTION_COMPLETE_SCRIPT = """
 """
 
 EXTRACTION_SCRIPT = """
-(sectionId) => {""" + _FIND_VISIBLE_CHART + """
+(sectionIds) => {""" + _FIND_VISIBLE_CHART + """
   if (!chart) {
     return { candidateCount: 0, resolvedCandidateCount: 0, rows: [] };
   }
@@ -192,14 +207,18 @@ class PlaywrightChartSource:
 
     def _chart(self):
         page = self._active_page
-        chart = page.locator(f"#{TARGET_SECTION_ID}").filter(visible=True)
-        if chart.count():
-            return chart
+        for section_id in SECTION_IDS:
+            chart = page.locator(f"#{section_id}").filter(visible=True)
+            if chart.count():
+                return chart
 
         title = page.get_by_text(TARGET_TITLE, exact=True).filter(visible=True)
         return title.locator(
-            "xpath=ancestor::*[.//button[@role='combobox']][1]"
-        )
+            "xpath=ancestor::*[not(self::body) and not(self::html) and "
+            ".//button[@role='combobox'] and "
+            ".//*[local-name()='svg' and contains(concat(' ', normalize-space(@class), ' '), "
+            "' recharts-surface ')]][1]"
+        ).first
 
     def _open_chart(self) -> None:
         page = self._active_page
@@ -240,7 +259,7 @@ class PlaywrightChartSource:
 
         page.wait_for_function(
             SELECTION_COMPLETE_SCRIPT,
-            arg=TARGET_SECTION_ID,
+            arg=list(SECTION_IDS),
             timeout=self._timeout,
         )
         if dialog.is_visible():
@@ -251,7 +270,7 @@ class PlaywrightChartSource:
     def extract_points(self) -> list[ExportPoint]:
         page = self._active_page
         page.wait_for_timeout(SETTLE_DELAY)
-        extraction = page.evaluate(EXTRACTION_SCRIPT, TARGET_SECTION_ID)
+        extraction = page.evaluate(EXTRACTION_SCRIPT, list(SECTION_IDS))
 
         candidate_count = int(extraction["candidateCount"])
         resolved_candidate_count = int(extraction["resolvedCandidateCount"])
