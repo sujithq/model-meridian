@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import textwrap
+import unittest
+from pathlib import Path
+
+from tests.helpers import ROOT
+
+
+def bash_path() -> str | None:
+    if os.name == "nt":
+        git = shutil.which("git")
+        if git is not None:
+            candidate = Path(git).parent.parent / "bin" / "bash.exe"
+            if candidate.is_file():
+                return str(candidate)
+        return None
+    return shutil.which("bash")
+
+
+@unittest.skipUnless(bash_path(), "Bash is not installed")
+class RefreshRetryTests(unittest.TestCase):
+    def run_export_step(self, statuses: str) -> subprocess.CompletedProcess[str]:
+        workflow = (ROOT / ".github" / "workflows" / "data-export.yml").read_text(
+            encoding="utf-8"
+        )
+        step = workflow.split("      - name: Export source chart data to CSV\n", 1)[1]
+        body = step.split("        run: |\n", 1)[1].split("\n      - name:", 1)[0]
+        script = textwrap.dedent(body)
+        harness = """
+set -e -o pipefail
+calls=0
+read -r -a statuses <<< "$TEST_STATUSES"
+python() {
+  calls=$((calls + 1))
+  return "${statuses[$((calls - 1))]:-99}"
+}
+sleep() { echo "sleep=$1"; }
+trap 'echo "calls=$calls"' EXIT
+"""
+        executable = bash_path()
+        self.assertIsNotNone(executable)
+        return subprocess.run(
+            [executable, "-c", harness + script],
+            env={**os.environ, "TEST_STATUSES": statuses},
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    def test_success_is_not_retried(self) -> None:
+        result = self.run_export_step("0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("calls=1", result.stdout)
+        self.assertNotIn("sleep=", result.stdout)
+
+    def test_transient_failure_is_retried_once(self) -> None:
+        result = self.run_export_step("75 0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("calls=2", result.stdout)
+        self.assertEqual(result.stdout.count("sleep=30"), 1)
+
+    def test_persistent_transient_failure_stays_failed(self) -> None:
+        result = self.run_export_step("75 75")
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertIn("calls=2", result.stdout)
+        self.assertEqual(result.stdout.count("sleep=30"), 1)
+
+    def test_structural_failure_is_not_retried(self) -> None:
+        result = self.run_export_step("1")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("calls=1", result.stdout)
+        self.assertNotIn("sleep=", result.stdout)
+
+    def test_other_exit_statuses_are_preserved(self) -> None:
+        result = self.run_export_step("2")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("calls=1", result.stdout)
+
+
+if __name__ == "__main__":
+    unittest.main()

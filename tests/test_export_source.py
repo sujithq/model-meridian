@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,18 +13,23 @@ import tests.helpers  # noqa: F401  (puts scripts/ on sys.path)
 PLAYWRIGHT_AVAILABLE = importlib.util.find_spec("playwright") is not None
 
 if PLAYWRIGHT_AVAILABLE:
+    import export_artificial_analysis_csv as exporter
     import export_source
 
 
 def chromium_available() -> bool:
     if not PLAYWRIGHT_AVAILABLE:
+        if os.environ.get("REQUIRE_BROWSER_TESTS") == "1":
+            raise RuntimeError("Browser tests are required, but Playwright is not installed.")
         return False
     from playwright.sync_api import sync_playwright
 
     try:
         with sync_playwright() as playwright:
             playwright.chromium.launch(headless=True).close()
-    except Exception:
+    except Exception as exc:
+        if os.environ.get("REQUIRE_BROWSER_TESTS") == "1":
+            raise RuntimeError("Browser tests are required, but Chromium could not launch.") from exc
         return False
     return True
 
@@ -125,6 +131,44 @@ selector.addEventListener('click', () => {{
 
 @unittest.skipUnless(chromium_available(), "Playwright Chromium is not installed")
 class PlaywrightChartSourceFixtureTests(unittest.TestCase):
+    def test_saves_diagnostics_when_export_fails_inside_an_open_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            diagnostics = Path(directory) / "diagnostics"
+            page.write_text(
+                fixture_html(export_source.TARGET_SECTION_ID, export_source.TARGET_TITLE),
+                encoding="utf-8",
+            )
+            with mock.patch.object(export_source, "SITE_URL", page.as_uri()):
+                with self.assertRaisesRegex(RuntimeError, "fixture export failed"):
+                    with export_source.PlaywrightChartSource(
+                        timeout=15000, diagnostics_dir=diagnostics
+                    ):
+                        raise RuntimeError("fixture export failed")
+            details = json.loads((diagnostics / "diagnostics.json").read_text())
+            self.assertEqual(details["error"], "fixture export failed")
+            self.assertIn(export_source.TARGET_SECTION_ID, details["page"]["sectionIds"])
+            self.assertEqual(details["page"]["plotCount"], 2)
+            self.assertTrue((diagnostics / "page.png").is_file())
+            self.assertIn(export_source.TARGET_TITLE, (diagnostics / "page.html").read_text())
+
+    def test_saves_diagnostics_when_opening_the_chart_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            diagnostics = Path(directory) / "diagnostics"
+            page.write_text("<html><body>No chart</body></html>", encoding="utf-8")
+            with mock.patch.object(export_source, "SITE_URL", page.as_uri()):
+                source = export_source.PlaywrightChartSource(
+                    timeout=100, diagnostics_dir=diagnostics
+                )
+                with self.assertRaises(export_source.PlaywrightTimeoutError):
+                    with source:
+                        self.fail("A missing chart must not open successfully.")
+            self.assertIsNone(source._page)
+            details = json.loads((diagnostics / "diagnostics.json").read_text())
+            self.assertEqual(details["error_type"], "TimeoutError")
+            self.assertEqual(details["page"]["plotCount"], 0)
+
     def test_selects_all_releases_and_extracts_full_variant_names(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             page = Path(directory) / "index.html"
@@ -237,6 +281,38 @@ class PlaywrightChartSourceFixtureTests(unittest.TestCase):
                 ("release-variant", "Alpha 2 (low)"),
                 ("other-release", "Beta"),
             ],
+        )
+
+
+@unittest.skipUnless(PLAYWRIGHT_AVAILABLE, "Playwright is not installed")
+class ExportCliTests(unittest.TestCase):
+    def test_parses_fixed_output_and_diagnostics_into_configuration(self) -> None:
+        config = exporter.parse_args(
+            ["--output", "data.csv", "--diagnostics-dir", "diagnostics"]
+        )
+        self.assertEqual(config.options.output_path, Path("data.csv"))
+        self.assertEqual(config.diagnostics_dir, Path("diagnostics"))
+
+    def test_retains_dated_snapshot_output(self) -> None:
+        config = exporter.parse_args(["--output-dir", "snapshots", "--filter", "Alpha"])
+        self.assertEqual(config.options.output_dir, Path("snapshots"))
+        self.assertEqual(config.options.model_filter, "Alpha")
+        self.assertIsNone(config.options.output_path)
+
+    def test_only_browser_timeouts_and_network_errors_are_retryable(self) -> None:
+        self.assertTrue(
+            export_source.is_retryable_source_error(export_source.PlaywrightTimeoutError("timeout"))
+        )
+        self.assertTrue(
+            export_source.is_retryable_source_error(
+                export_source.PlaywrightError("Page.goto: net::ERR_CONNECTION_RESET")
+            )
+        )
+        self.assertFalse(
+            export_source.is_retryable_source_error(RuntimeError("no extractable model payloads"))
+        )
+        self.assertFalse(
+            export_source.is_retryable_source_error(export_source.PlaywrightError("invalid selector"))
         )
 
 

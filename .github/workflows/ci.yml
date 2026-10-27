@@ -7,6 +7,7 @@ on:
       - "data/*.csv"
       - ".gitignore"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - "**/*.md"
       - "data/*.csv"
@@ -24,10 +25,14 @@ jobs:
         with:
           python-version: "3.x"
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
       - name: Compile Python source
-        run: python -m py_compile scripts/chart_data.py scripts/generate_chart.py scripts/generate_page.py scripts/export_artificial_analysis_csv.py
+        run: python -m py_compile scripts/chart_data.py scripts/generate_chart.py scripts/generate_page.py scripts/page_data.py scripts/page_builder.py scripts/export_pipeline.py scripts/export_source.py scripts/export_artificial_analysis_csv.py
       - name: Run characterization tests
+        env:
+          REQUIRE_BROWSER_TESTS: "1"
         run: python -m unittest discover -s tests -v
       - name: Render example outputs
         run: |

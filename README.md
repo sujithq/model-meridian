@@ -61,7 +61,7 @@ The data export is split the same way, keeping the volatile browser boundary
 isolated behind the `ModelSource` protocol:
 
 - `scripts/export_pipeline.py` holds the source-agnostic pipeline — filtering,
-  ordering, de-duplication, CSV validation, and atomic CSV writing. It is
+  ordering, de-duplication, CSV validation, ID/content comparison, and atomic CSV writing. It is
   standard-library only, so it imports and tests without a browser driver.
 - `scripts/export_source.py` holds the only Playwright-dependent code: the site
   URL, chart selectors, and the in-page extraction script.
@@ -72,6 +72,9 @@ GitHub automation is configured in [`.github/workflows/`](.github/workflows/):
 
 - `ci.yml` compiles the Python source, runs the tests, and renders example outputs.
 - `data-export.yml` refreshes the original source data in `data/data.csv` on a daily schedule or on demand.
+- `data-export-repair.md` defines an opt-in GitHub Agentic Workflow that diagnoses
+  failed refreshes and proposes a verified draft repair PR or an investigation
+  issue. Its generated `data-export-repair.lock.yml` is committed alongside it.
 - `deploy-pages.yml` builds `src/index.html` from the exported CSV and deploys it to GitHub Pages.
 - `dependabot-sequential-merge.yml` rebases and auto-merges Dependabot pull requests one at a time in creation order.
 
@@ -109,6 +112,14 @@ python -m pip install -r requirements.txt
 python -m playwright install --with-deps chromium
 ```
 
+Python packages use the Microsoft PyPI proxy configured in `requirements.txt`
+(`https://packagefeedproxy.microsoft.io/pypi/simple`). The Playwright minimum is
+1.64.0, available from that feed. npm uses the Microsoft registry in `.npmrc`
+(`https://packagefeedproxy.microsoft.io/npm/`); existing lockfile download URLs
+also use that proxy, without changing pinned dependency versions or integrity hashes.
+Do not fall back to public package indexes. This repository has no NuGet
+dependencies.
+
 The compiled Tailwind asset is committed, so normal page generation does not
 require Node.js. After changing `theme_sources/tailwind.css` or its pinned
 dependencies, rebuild it with:
@@ -133,6 +144,8 @@ driven by an in-memory stand-in for the browser source. When Playwright's
 Chromium is installed (`python -m playwright install chromium`), a local HTML
 fixture also exercises the browser source's release selection and extraction;
 otherwise that test is skipped.
+CI installs Chromium and sets `REQUIRE_BROWSER_TESTS=1`, so missing browser
+dependencies fail validation instead of silently skipping browser coverage.
 
 ## Contributing and security
 
@@ -265,11 +278,102 @@ python scripts/generate_page.py data\data.csv -o src\index.html
 ```
 
 `data-export.yml` runs daily at 02:00 UTC (and on demand), validates the live
-export, replaces `data/data.csv`, and commits it only when data changed.
+export, and updates `data/data.csv` using:
+
+```powershell
+python scripts\export_artificial_analysis_csv.py --output data\data.csv `
+  --diagnostics-dir out\export-diagnostics
+```
+
+The exporter compares rows by `id` and their content, ignoring row order,
+numeric formatting and `extracted_at`. Added or removed IDs, or changed names,
+costs, scores, URLs, colors or source metadata, count as changes. An unchanged
+refresh leaves the existing file's bytes, timestamp column and modification time
+untouched, so it produces no data commit. `extracted_at` remains the observation
+time of the committed snapshot; Actions records when unchanged data was last
+checked. The CSV columns and the original dated `--output-dir` exports are
+unchanged.
+
+Fixed-path updates refuse to overwrite the previous CSV if more than 20% of
+its IDs disappear. For intentional large removals, generate a separate
+`--output-dir` snapshot, inspect the changes, and replace the baseline only
+after human review. Validation failures also preserve the previous CSV.
+
+Refreshes are serialized. Browser timeouts and recognized transient network
+errors exit with status 75 and are retried once after 30 seconds; structural
+and data-validation failures are not retried. Failed exports save
+`diagnostics.json`, `page.html` and `page.png` when the browser is available.
+Actions uploads these as `export-diagnostics` with a seven-day retention.
+Diagnostic capture failures are logged without replacing the original error.
+
 `deploy-pages.yml` runs after a successful export, generates `src/index.html`,
 uploads `src/` as the Pages artifact, and deploys it. It can also be started
 manually to publish the currently committed CSV. This deterministic script flow
 does not require the custom Copilot agent at runtime.
+
+### Automated failure investigation and repair
+
+The optional [GitHub Agentic Workflows](https://github.github.io/gh-aw/) workflow
+in [`.github/workflows/data-export-repair.md`](.github/workflows/data-export-repair.md)
+runs only after **Refresh source data** fails on this repository's `main`
+branch. It reads logs and diagnostics, investigates the live public chart, and
+attempts at most one focused repair:
+
+- Only `scripts/export_source.py` and `tests/test_export_source.py` may appear
+  in an automatically proposed patch. The safe-output allowlist enforces this;
+  the agent cannot publish workflow, dependency, validation or CSV changes.
+- A repair must include a regression test, the full suite with browser tests
+  required, and a successful live export against a copy of the current CSV.
+  Otherwise it reports an investigation issue rather than a speculative PR.
+- PRs are drafts for human review; no direct `main` writes or auto-merges are
+  configured. Safe outputs publish changes in a separate permission-controlled
+  job; the agent itself has read-only GitHub permissions.
+- An open issue or PR with `[source-refresh]` in its title suppresses further
+  investigations. Close or resolve it when another attempt is appropriate.
+  Runs are serialized, capped at 40 turns and 20 minutes, with a 200-AI-credit
+  agent budget per run and per 24 hours. The separate safety detector has a
+  10-turn/100-AI-credit cap. Framework setup and safety checks can incur
+  additional Actions/inference usage.
+- The agent treats website content and diagnostic artifacts as untrusted data.
+  Its network allowlist permits GitHub, dependency/browser infrastructure, local
+  fixture tests and Artificial Analysis, not arbitrary websites.
+
+#### One-time activation
+
+The repair workflow is **off by default**; normal refreshes do not require AI
+credentials. After a human reviews and merges the workflow changes:
+
+1. Add the Actions secret `COPILOT_GITHUB_TOKEN`, using a fine-grained token for
+   a Copilot-enabled account with the **Copilot Requests** permission. Follow
+   the [engine authentication guide](https://github.github.io/gh-aw/reference/auth/#copilot_github_token).
+   Do not reuse the Dependabot merge token or paste credentials into an issue.
+2. In repository **Settings → Actions → General → Workflow permissions**, allow
+   GitHub Actions to create pull requests. The compiled safe-output job requests
+   only the write permissions needed to publish its draft PR or issue.
+3. Enable the repository Actions variable:
+
+   ```powershell
+   gh variable set SOURCE_REFRESH_REPAIR_ENABLED --body true
+   ```
+
+Set that variable to `false` to disable repairs without affecting refreshes.
+GitHub-token-created draft PRs do not trigger normal CI automatically; moving
+the draft to **Ready for review** triggers this repository's CI, including
+mandatory browser tests. Review the evidence and successful checks before
+merging. Changes to workflows or the CSV input contract always require a person.
+
+To edit or reproduce the compiled workflow, use the pinned compiler:
+
+```powershell
+gh extension install github/gh-aw --pin v0.93.5
+gh aw compile data-export-repair
+gh aw compile data-export-repair --no-emit --validate
+```
+
+Commit the Markdown definition, generated lock file, and any updated
+`.github/aw/actions-lock.json` after changes.
+The generated lock file pins the framework, actions and engine versions; edit
+the Markdown source instead of editing the lock file manually.
 
 The page supports:
 

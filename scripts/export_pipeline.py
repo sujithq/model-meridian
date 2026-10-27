@@ -30,6 +30,7 @@ FIELDNAMES = (
     "source_page",
     "extracted_at",
 )
+MAX_REMOVAL_FRACTION = 0.20
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +56,19 @@ class SourceMetadata:
 class ExportOptions:
     output_dir: Path
     model_filter: str = ""
+    output_path: Path | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ExportChanges:
+    previous_count: int
+    added_ids: tuple[str, ...]
+    removed_ids: tuple[str, ...]
+    updated_ids: tuple[str, ...]
+
+    @property
+    def has_changes(self) -> bool:
+        return bool(self.added_ids or self.removed_ids or self.updated_ids)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +77,7 @@ class ExportResult:
     selected_count: int
     plotted_count: int
     points: list[ExportPoint]
+    changes: ExportChanges | None = None
 
 
 @runtime_checkable
@@ -159,11 +174,64 @@ def validate_csv(path: Path, expected_count: int) -> None:
         )
 
 
-def write_csv(points: list[ExportPoint], output_dir: Path, metadata: SourceMetadata) -> Path:
-    local_now = paris_now()
-    filename = f"{metadata.slug}-{local_now.strftime('%Y-%m-%d')}.csv"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / filename
+def point_row(
+    point: ExportPoint, metadata: SourceMetadata, extracted_at: str
+) -> dict[str, str]:
+    return {
+        "id": point.id,
+        "model": point.model,
+        "cost_per_task_usd": f"{point.cost_per_task_usd:.15g}",
+        "intelligence_index": f"{point.intelligence_index:.15g}",
+        "model_url": point.model_url,
+        "color": point.color,
+        "source_chart": metadata.chart,
+        "source_page": metadata.page,
+        "extracted_at": extracted_at,
+    }
+
+
+def _record_content(row: dict[str, str]) -> tuple[str, ...]:
+    return tuple(
+        f"{float(row[field]):.15g}"
+        if field in ("cost_per_task_usd", "intelligence_index")
+        else row.get(field, "") or ""
+        for field in FIELDNAMES
+        if field not in ("id", "extracted_at")
+    )
+
+
+def compare_csv(
+    path: Path, points: list[ExportPoint], metadata: SourceMetadata
+) -> ExportChanges:
+    """Compare by stable ID and exported content, not ordering or observation time."""
+    previous = {}
+    if path.exists():
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        validate_csv(path, len(rows))
+        previous = {row["id"]: _record_content(row) for row in rows}
+
+    current = {
+        point.id: _record_content(point_row(point, metadata, "")) for point in points
+    }
+    return ExportChanges(
+        previous_count=len(previous),
+        added_ids=tuple(sorted(current.keys() - previous.keys())),
+        removed_ids=tuple(sorted(previous.keys() - current.keys())),
+        updated_ids=tuple(
+            sorted(
+                row_id
+                for row_id in current.keys() & previous.keys()
+                if current[row_id] != previous[row_id]
+            )
+        ),
+    )
+
+
+def _write_csv(
+    points: list[ExportPoint], path: Path, metadata: SourceMetadata
+) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     temp_path: Path | None = None
     try:
@@ -171,8 +239,8 @@ def write_csv(points: list[ExportPoint], output_dir: Path, metadata: SourceMetad
             "w",
             encoding="utf-8-sig",
             newline="",
-            dir=output_dir,
-            prefix=f".{filename}.",
+            dir=path.parent,
+            prefix=f".{path.name}.",
             suffix=".tmp",
             delete=False,
         ) as handle:
@@ -181,19 +249,7 @@ def write_csv(points: list[ExportPoint], output_dir: Path, metadata: SourceMetad
             writer.writeheader()
             extracted_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             for point in points:
-                writer.writerow(
-                    {
-                        "id": point.id,
-                        "model": point.model,
-                        "cost_per_task_usd": f"{point.cost_per_task_usd:.15g}",
-                        "intelligence_index": f"{point.intelligence_index:.15g}",
-                        "model_url": point.model_url,
-                        "color": point.color,
-                        "source_chart": metadata.chart,
-                        "source_page": metadata.page,
-                        "extracted_at": extracted_at,
-                    }
-                )
+                writer.writerow(point_row(point, metadata, extracted_at))
         validate_csv(temp_path, len(points))
         os.replace(temp_path, path)
     finally:
@@ -201,6 +257,11 @@ def write_csv(points: list[ExportPoint], output_dir: Path, metadata: SourceMetad
             temp_path.unlink(missing_ok=True)
 
     return path
+
+
+def write_csv(points: list[ExportPoint], output_dir: Path, metadata: SourceMetadata) -> Path:
+    filename = f"{metadata.slug}-{paris_now().strftime('%Y-%m-%d')}.csv"
+    return _write_csv(points, output_dir / filename, metadata)
 
 
 def run_export(source: ModelSource, options: ExportOptions) -> ExportResult:
@@ -221,10 +282,25 @@ def run_export(source: ModelSource, options: ExportOptions) -> ExportResult:
     if not points:
         raise RuntimeError("The model-name filter matched no plotted models.")
 
-    path = write_csv(points, options.output_dir, source.metadata)
+    changes = None
+    if options.output_path is None:
+        path = write_csv(points, options.output_dir, source.metadata)
+    else:
+        path = options.output_path
+        changes = compare_csv(path, points, source.metadata)
+        if len(changes.removed_ids) > changes.previous_count * MAX_REMOVAL_FRACTION:
+            raise RuntimeError(
+                f"Refusing to replace {path}: {len(changes.removed_ids)} of "
+                f"{changes.previous_count} existing IDs disappeared "
+                f"(more than {MAX_REMOVAL_FRACTION:.0%}). "
+                "Inspect a separate --output-dir export before approving this change."
+            )
+        if changes.has_changes:
+            _write_csv(points, path, source.metadata)
     return ExportResult(
         path=path,
         selected_count=selected_count,
         plotted_count=plotted_count,
         points=points,
+        changes=changes,
     )

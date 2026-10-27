@@ -8,8 +8,13 @@ against the `ModelSource` protocol in `export_pipeline.py`.
 
 from __future__ import annotations
 
+import json
+import logging
+from pathlib import Path
 from types import TracebackType
 
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from export_pipeline import ExportPoint, SourceMetadata
@@ -27,6 +32,24 @@ PAGE_TIMEOUT = 600000
 DIALOG_TIMEOUT = 60000
 SETTLE_DELAY = 6000
 VIEWPORT = {"width": 1600, "height": 1200}
+LOGGER = logging.getLogger(__name__)
+
+
+def is_retryable_source_error(error: Exception) -> bool:
+    if isinstance(error, PlaywrightTimeoutError):
+        return True
+    return isinstance(error, PlaywrightError) and any(
+        code in str(error)
+        for code in (
+            "net::ERR_CONNECTION_RESET",
+            "net::ERR_CONNECTION_CLOSED",
+            "net::ERR_CONNECTION_REFUSED",
+            "net::ERR_NAME_NOT_RESOLVED",
+            "net::ERR_NETWORK_CHANGED",
+            "net::ERR_INTERNET_DISCONNECTED",
+            "net::ERR_TIMED_OUT",
+        )
+    )
 
 # The site has rendered the same section ID in several tab panels; only the
 # visible copy is the one the user (and the selector dialog) interacts with.
@@ -158,9 +181,16 @@ class PlaywrightChartSource:
     and `extract_points()`.
     """
 
-    def __init__(self, *, headless: bool = True, timeout: int = PAGE_TIMEOUT) -> None:
+    def __init__(
+        self,
+        *,
+        headless: bool = True,
+        timeout: int = PAGE_TIMEOUT,
+        diagnostics_dir: Path | None = None,
+    ) -> None:
         self._headless = headless
         self._timeout = timeout
+        self._diagnostics_dir = diagnostics_dir
         self._playwright = None
         self._browser = None
         self._page = None
@@ -175,7 +205,9 @@ class PlaywrightChartSource:
             self._browser = self._playwright.chromium.launch(headless=self._headless)
             self._page = self._browser.new_page(viewport=VIEWPORT)
             self._open_chart()
-        except BaseException:
+        except BaseException as exc:
+            if isinstance(exc, Exception):
+                self._save_diagnostics(exc)
             self.close()
             raise
         return self
@@ -186,7 +218,68 @@ class PlaywrightChartSource:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        self.close()
+        try:
+            if isinstance(exc, Exception):
+                self._save_diagnostics(exc)
+        finally:
+            self.close()
+
+    def _save_diagnostics(self, error: Exception) -> None:
+        directory = self._diagnostics_dir
+        if directory is None:
+            return
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            LOGGER.warning("Could not create export diagnostics directory %s", directory, exc_info=True)
+            return
+
+        details: dict[str, object] = {"error_type": type(error).__name__, "error": str(error)}
+        if self._page is not None:
+            page = self._page
+            for filename, capture in (
+                (
+                    "page.png",
+                    lambda: page.screenshot(
+                        path=str(directory / "page.png"), full_page=True, timeout=10000
+                    ),
+                ),
+                (
+                    "page.html",
+                    lambda: (directory / "page.html").write_text(
+                        page.content(), encoding="utf-8"
+                    ),
+                ),
+            ):
+                try:
+                    capture()
+                except (PlaywrightError, OSError):
+                    LOGGER.warning("Could not capture %s", filename, exc_info=True)
+            try:
+                details["page"] = page.evaluate(
+                    """() => ({
+                      url: location.href,
+                      sectionIds: [...document.querySelectorAll('[id]')]
+                        .map(node => node.id)
+                        .filter(id => /intelligence|efficiency|cost|release/i.test(id)),
+                      selectors: [...document.querySelectorAll('button[role="combobox"]')]
+                        .filter(node => node.getClientRects().length > 0)
+                        .map(node => node.textContent.trim()),
+                      titles: [...document.querySelectorAll('h1,h2,h3')]
+                        .filter(node => node.getClientRects().length > 0)
+                        .map(node => node.textContent.trim()),
+                      plotCount: document.querySelectorAll('svg.recharts-surface').length,
+                      markedPointCount: document.querySelectorAll('[data-chart-item-id]').length
+                    })"""
+                )
+            except PlaywrightError:
+                LOGGER.warning("Could not capture chart metadata", exc_info=True)
+        try:
+            (directory / "diagnostics.json").write_text(
+                json.dumps(details, indent=2), encoding="utf-8"
+            )
+        except OSError:
+            LOGGER.warning("Could not write export diagnostics metadata", exc_info=True)
 
     def close(self) -> None:
         if self._browser is not None:
