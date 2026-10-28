@@ -54,7 +54,7 @@ def parse_args(argv: list[str] | None = None) -> ExportConfig:
     parser.add_argument(
         "--diagnostics-dir",
         type=Path,
-        help="Save a screenshot, rendered HTML and chart metadata here if export fails.",
+        help="Save browser, network and extraction diagnostics here after export.",
     )
     args = parser.parse_args(argv)
     return ExportConfig(

@@ -23,6 +23,16 @@ def bash_path() -> str | None:
 
 @unittest.skipUnless(bash_path(), "Bash is not installed")
 class RefreshRetryTests(unittest.TestCase):
+    def test_diagnostic_branches_do_not_publish_csv_changes(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "data-export.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("ref: ${{ github.ref }}", workflow)
+        commit_step = workflow.split("      - name: Commit refreshed CSV\n", 1)[1]
+        self.assertTrue(commit_step.startswith("        if: github.ref == 'refs/heads/main'\n"))
+        upload_step = workflow.split("      - name: Upload export diagnostics\n", 1)[1]
+        self.assertTrue(upload_step.startswith("        if: always()\n"))
+
     def run_export_step(self, statuses: str) -> subprocess.CompletedProcess[str]:
         workflow = (ROOT / ".github" / "workflows" / "data-export.yml").read_text(
             encoding="utf-8"
