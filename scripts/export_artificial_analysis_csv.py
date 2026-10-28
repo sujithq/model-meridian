@@ -52,6 +52,11 @@ def parse_args(argv: list[str] | None = None) -> ExportConfig:
         help="Optional case-insensitive model-name filter applied after all models are selected.",
     )
     parser.add_argument(
+        "--allow-large-removals",
+        action="store_true",
+        help="Bypass the 20%% missing-ID guard for fixed-path updates; CSV validation stays enabled.",
+    )
+    parser.add_argument(
         "--diagnostics-dir",
         type=Path,
         help="Save browser, network and extraction diagnostics here after export.",
@@ -59,7 +64,10 @@ def parse_args(argv: list[str] | None = None) -> ExportConfig:
     args = parser.parse_args(argv)
     return ExportConfig(
         options=ExportOptions(
-            output_dir=args.output_dir, model_filter=args.filter, output_path=args.output
+            output_dir=args.output_dir,
+            model_filter=args.filter,
+            output_path=args.output,
+            allow_large_removals=args.allow_large_removals,
         ),
         diagnostics_dir=args.diagnostics_dir,
     )

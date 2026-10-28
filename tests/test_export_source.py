@@ -132,6 +132,44 @@ selector.addEventListener('click', () => {{
 
 @unittest.skipUnless(chromium_available(), "Playwright Chromium is not installed")
 class PlaywrightChartSourceFixtureTests(unittest.TestCase):
+    def test_records_checkbox_selection_before_and_after_select_all(self) -> None:
+        html = fixture_html(export_source.TARGET_SECTION_ID, export_source.TARGET_TITLE)
+        html = html.replace(
+            "dialog.children[1].addEventListener('click', () => {",
+            """for (let index = 0; index < 2; index++) {
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = index === 0;
+    dialog.appendChild(checkbox);
+  }
+  dialog.children[1].addEventListener('click', () => {""",
+        ).replace(
+            "selector.textContent = '2 of 2 releases';",
+            """selector.textContent = '2 of 2 releases';
+      for (const checkbox of dialog.querySelectorAll('input')) checkbox.checked = true;""",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            diagnostics = Path(directory) / "diagnostics"
+            page.write_text(html, encoding="utf-8")
+            with mock.patch.object(export_source, "SITE_URL", page.as_uri()):
+                with export_source.PlaywrightChartSource(
+                    timeout=15000, diagnostics_dir=diagnostics
+                ) as source:
+                    self.assertEqual(source.select_all(), 2)
+            details = json.loads((diagnostics / "diagnostics.json").read_text())
+        selection = details["selection"]
+        self.assertEqual(selection["before_label"], "1 of 2 releases")
+        self.assertEqual(selection["after_label"], "2 of 2 releases")
+        self.assertEqual(
+            selection["before_dialog"],
+            {"checkboxCount": 2, "checkedCount": 1, "uncheckedCount": 1},
+        )
+        self.assertEqual(
+            selection["after_dialog"],
+            {"checkboxCount": 2, "checkedCount": 2, "uncheckedCount": 0},
+        )
+
     def test_saves_diagnostics_after_a_successful_export(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             page = Path(directory) / "index.html"
@@ -488,6 +526,11 @@ class ExportCliTests(unittest.TestCase):
         )
         self.assertEqual(config.options.output_path, Path("data.csv"))
         self.assertEqual(config.diagnostics_dir, Path("diagnostics"))
+        self.assertFalse(config.options.allow_large_removals)
+
+    def test_parses_explicit_removal_guard_bypass(self) -> None:
+        config = exporter.parse_args(["--output", "data.csv", "--allow-large-removals"])
+        self.assertTrue(config.options.allow_large_removals)
 
     def test_retains_dated_snapshot_output(self) -> None:
         config = exporter.parse_args(["--output-dir", "snapshots", "--filter", "Alpha"])

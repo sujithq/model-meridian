@@ -74,6 +74,7 @@ jobs:
                   with export_source.PlaywrightChartSource(
                       timeout=60000, diagnostics_dir=output
                   ) as source:
+                      default_points = source.extract_points()
                       result = run_export(source, ExportOptions(output_dir=output))
               ids = {point.id for point in result.points}
               comparison = {
@@ -82,6 +83,8 @@ jobs:
                   "selected_count": result.selected_count,
                   "plotted_count": result.plotted_count,
                   "exported_count": len(ids),
+                  "default_point_count": len(default_points),
+                  "default_ids": sorted(point.id for point in default_points),
                   "retained_count": len(ids & baseline_ids),
                   "missing_ids": sorted(baseline_ids - ids),
                   "added_ids": sorted(ids - baseline_ids),
@@ -93,7 +96,8 @@ jobs:
               )
               print(
                   f"{name} {width}x{height}: selected={result.selected_count}, "
-                  f"points={len(ids)}, retained={len(ids & baseline_ids)}, "
+                  f"default_points={len(default_points)}, points={len(ids)}, "
+                  f"retained={len(ids & baseline_ids)}, "
                   f"missing={len(baseline_ids - ids)}",
                   flush=True,
               )
@@ -107,6 +111,7 @@ jobs:
             status=0
             python scripts/export_artificial_analysis_csv.py \
               --output data/data.csv \
+              --allow-large-removals \
               --diagnostics-dir out/export-diagnostics || status=$?
             if [ "$status" -eq 0 ]; then
               exit 0

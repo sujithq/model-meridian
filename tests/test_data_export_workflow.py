@@ -48,10 +48,19 @@ class RefreshRetryTests(unittest.TestCase):
         self.assertNotIn("output_path=", body)
         self.assertIn('("large", 2560, 1440)', body)
         self.assertIn('("ultrawide", 3840, 2160)', body)
+        self.assertIn("default_points = source.extract_points()", body)
         export_step = workflow.split("      - name: Export source chart data to CSV\n", 1)[1]
         self.assertTrue(export_step.startswith("        if: ${{ !inputs.compare_viewports }}\n"))
         script = textwrap.dedent(body).split("python - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
         compile(script, "<viewport-comparison>", "exec")
+
+    def test_refresh_explicitly_bypasses_the_retained_removal_guard(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "data-export.yml").read_text(
+            encoding="utf-8"
+        )
+        step = workflow.split("      - name: Export source chart data to CSV\n", 1)[1]
+        body = step.split("\n      - name:", 1)[0]
+        self.assertIn("--allow-large-removals", body)
 
     def run_export_step(self, statuses: str) -> subprocess.CompletedProcess[str]:
         workflow = (ROOT / ".github" / "workflows" / "data-export.yml").read_text(

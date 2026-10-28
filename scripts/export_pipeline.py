@@ -10,6 +10,7 @@ site-specific scraping lives behind the `ModelSource` protocol in
 from __future__ import annotations
 
 import csv
+import logging
 import math
 import os
 import tempfile
@@ -31,6 +32,7 @@ FIELDNAMES = (
     "extracted_at",
 )
 MAX_REMOVAL_FRACTION = 0.20
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +59,7 @@ class ExportOptions:
     output_dir: Path
     model_filter: str = ""
     output_path: Path | None = None
+    allow_large_removals: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,11 +292,17 @@ def run_export(source: ModelSource, options: ExportOptions) -> ExportResult:
         path = options.output_path
         changes = compare_csv(path, points, source.metadata)
         if len(changes.removed_ids) > changes.previous_count * MAX_REMOVAL_FRACTION:
-            raise RuntimeError(
-                f"Refusing to replace {path}: {len(changes.removed_ids)} of "
-                f"{changes.previous_count} existing IDs disappeared "
-                f"(more than {MAX_REMOVAL_FRACTION:.0%}). "
-                "Inspect a separate --output-dir export before approving this change."
+            if not options.allow_large_removals:
+                raise RuntimeError(
+                    f"Refusing to replace {path}: {len(changes.removed_ids)} of "
+                    f"{changes.previous_count} existing IDs disappeared "
+                    f"(more than {MAX_REMOVAL_FRACTION:.0%}). "
+                    "Inspect a separate --output-dir export before approving this change."
+                )
+            LOGGER.warning(
+                "Removal guard bypassed for %s: allowing %s of %s existing IDs "
+                "to disappear; CSV validation remains enabled.",
+                path, len(changes.removed_ids), changes.previous_count,
             )
         if changes.has_changes:
             _write_csv(points, path, source.metadata)
