@@ -319,6 +319,9 @@ Fixed-path updates refuse to overwrite the previous CSV if more than 20% of
 its IDs disappear. For intentional large removals, generate a separate
 `--output-dir` snapshot, inspect the changes, and replace the baseline only
 after human review. Validation failures also preserve the previous CSV.
+When the release selector writes its selection to the page URL, the exporter
+reloads that URL and verifies the selection before extracting points, so an
+updated selector count cannot leave it reading the previous default plot.
 
 Refreshes are serialized. Browser timeouts and recognized transient network
 errors exit with status 75 and are retried once after 30 seconds; structural

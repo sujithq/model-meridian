@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 import tests.helpers  # noqa: F401  (puts scripts/ on sys.path)
 
@@ -199,6 +200,65 @@ class PlaywrightChartSourceFixtureTests(unittest.TestCase):
         self.assertEqual(points[0].cost_per_task_usd, 1.5)
         self.assertEqual(points[0].intelligence_index, 60.0)
         self.assertEqual(points[0].color, "#111111")
+
+    def test_reloads_selected_release_url_before_extracting_stale_plot(self) -> None:
+        html = fixture_html(export_source.TARGET_SECTION_ID, export_source.TARGET_TITLE)
+        html = html.replace(
+            "render(1);",
+            """const allSelected = new URLSearchParams(location.search).has('releases');
+if (allSelected) selector.textContent = '2 of 2 releases';
+render(allSelected ? points.length : 1);""",
+        ).replace(
+            "render(points.length);",
+            "history.replaceState(null, '', '?releases=alpha-2,beta' + location.hash);",
+        )
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                for reloaded_count in (2, 3):
+                    with self.subTest(reloaded_count=reloaded_count):
+                        visited = []
+                        with browser.new_context() as context:
+                            def serve(route) -> None:
+                                visited.append(route.request.url)
+                                body = html.replace(
+                                    "if (allSelected) selector.textContent = '2 of 2 releases';",
+                                    "if (allSelected) selector.textContent = "
+                                    f"'{reloaded_count} of {reloaded_count} releases';",
+                                )
+                                route.fulfill(
+                                    status=200, content_type="text/html", body=body
+                                )
+
+                            context.route("https://example.test/**", serve)
+                            source = export_source.PlaywrightChartSource(timeout=15000)
+                            source._page = context.new_page()
+                            with mock.patch.object(
+                                export_source, "SITE_URL", "https://example.test/"
+                            ), mock.patch.object(export_source, "SETTLE_DELAY", 0):
+                                source._open_chart()
+                                if reloaded_count == 3:
+                                    with self.assertRaisesRegex(
+                                        RuntimeError, "Release selection changed"
+                                    ):
+                                        source.select_all()
+                                else:
+                                    selected = source.select_all()
+                                    points = source.extract_points()
+                                    self.assertEqual(selected, 2)
+                                    self.assertEqual(
+                                        [point.id for point in points],
+                                        [point["id"] for point in POINTS],
+                                    )
+                            self.assertEqual(len(visited), 2)
+                            self.assertEqual(
+                                parse_qs(urlsplit(visited[1]).query)["releases"],
+                                ["alpha-2,beta"],
+                            )
+            finally:
+                browser.close()
 
     def test_finds_chart_by_title_when_section_id_changes(self) -> None:
         changed_section_id = "updated-chart-section"
