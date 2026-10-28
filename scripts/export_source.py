@@ -99,6 +99,20 @@ SELECTION_COMPLETE_SCRIPT = """
 }
 """
 
+SELECTION_STATE_SCRIPT = """
+(dialog) => {
+  const controls = [...dialog.querySelectorAll('input[type="checkbox"], [role="checkbox"]')];
+  const checked = (node) => node.tagName === 'INPUT'
+    ? node.checked
+    : node.getAttribute('aria-checked') === 'true';
+  return {
+    checkboxCount: controls.length,
+    checkedCount: controls.filter(checked).length,
+    uncheckedCount: controls.filter(node => !checked(node)).length,
+  };
+}
+"""
+
 EXTRACTION_SCRIPT = """
 (sectionIds) => {""" + _FIND_VISIBLE_CHART + """
   if (!chart) {
@@ -201,6 +215,7 @@ class PlaywrightChartSource:
         self._diagnostic_events: list[dict[str, object]] = []
         self._dropped_diagnostic_events = 0
         self._last_extraction: dict[str, object] | None = None
+        self._selection_diagnostics: dict[str, object] = {}
         self._diagnostics_started = monotonic()
 
     @property
@@ -211,6 +226,7 @@ class PlaywrightChartSource:
         self._diagnostic_events.clear()
         self._dropped_diagnostic_events = 0
         self._last_extraction = None
+        self._selection_diagnostics.clear()
         self._diagnostics_started = monotonic()
         self._playwright = sync_playwright().start()
         try:
@@ -314,6 +330,7 @@ class PlaywrightChartSource:
             "events": self._diagnostic_events,
             "dropped_event_count": self._dropped_diagnostic_events,
             "extraction": self._last_extraction,
+            "selection": self._selection_diagnostics,
         }
         if self._page is not None:
             page = self._page
@@ -339,6 +356,11 @@ class PlaywrightChartSource:
                 details["page"] = page.evaluate(
                     """() => ({
                       url: location.href,
+                      viewport: {
+                        width: window.innerWidth,
+                        height: window.innerHeight,
+                        devicePixelRatio: window.devicePixelRatio
+                      },
                       sectionIds: [...document.querySelectorAll('[id]')]
                         .map(node => node.id)
                         .filter(id => /intelligence|efficiency|cost|release/i.test(id)),
@@ -412,10 +434,14 @@ class PlaywrightChartSource:
                 f"Expected one model selector in the target chart, found {selector.count()}."
             )
         selector.wait_for(state="visible", timeout=self._timeout)
+        if self._diagnostics_dir is not None:
+            self._selection_diagnostics["before_label"] = selector.inner_text().strip()
         selector.click()
 
         dialog = page.get_by_role("dialog")
         dialog.wait_for(state="visible", timeout=DIALOG_TIMEOUT)
+        if self._diagnostics_dir is not None:
+            self._selection_diagnostics["before_dialog"] = dialog.evaluate(SELECTION_STATE_SCRIPT)
         select_all = dialog.get_by_role("button", name="Select all")
         if select_all.count() != 1:
             raise RuntimeError(
@@ -435,14 +461,23 @@ class PlaywrightChartSource:
             arg=list(SECTION_IDS),
             timeout=self._timeout,
         )
+        if self._diagnostics_dir is not None:
+            self._selection_diagnostics["after_label"] = selector.inner_text().strip()
+            if dialog.is_visible():
+                self._selection_diagnostics["after_dialog"] = dialog.evaluate(SELECTION_STATE_SCRIPT)
         if dialog.is_visible():
             page.keyboard.press("Escape")
             dialog.wait_for(state="hidden", timeout=DIALOG_TIMEOUT)
         selected_count = int(selector.inner_text().strip().split()[0])
+        releases = parse_qs(urlsplit(page.url).query).get("releases")
+        if self._diagnostics_dir is not None and releases:
+            self._selection_diagnostics["persisted_release_count"] = len(
+                set(releases[0].split(","))
+            )
 
         # The selector can update the URL and count before the plot consumes the
         # new release set. Rehydrate from that URL instead of exporting stale dots.
-        if parse_qs(urlsplit(page.url).query).get("releases"):
+        if releases:
             page.reload(wait_until="domcontentloaded", timeout=self._timeout)
             self._chart().wait_for(state="visible", timeout=self._timeout)
             page.wait_for_function(
@@ -451,6 +486,8 @@ class PlaywrightChartSource:
                 timeout=self._timeout,
             )
             reloaded_count = int(selector.inner_text().strip().split()[0])
+            if self._diagnostics_dir is not None:
+                self._selection_diagnostics["reloaded_label"] = selector.inner_text().strip()
             if reloaded_count != selected_count:
                 raise RuntimeError(
                     "Release selection changed after reloading the chart: "

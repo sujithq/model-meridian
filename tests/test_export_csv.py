@@ -247,6 +247,39 @@ class RunExportTests(unittest.TestCase):
 
         self.assertEqual(result.changes.removed_ids, ("fifth",))
 
+    def test_explicit_bypass_allows_large_removals_and_warns(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "data.csv"
+            options = ExportOptions(output_dir=Path(directory), output_path=path)
+            run_export(FakeSource(export_points()), options)
+            with self.assertLogs("export_pipeline", level="WARNING") as logs:
+                result = run_export(
+                    FakeSource(export_points()[:1]),
+                    replace(options, allow_large_removals=True),
+                )
+            with path.open(encoding="utf-8-sig", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+        self.assertEqual(len(result.changes.removed_ids), 3)
+        self.assertEqual([row["id"] for row in rows], ["beta"])
+        self.assertIn("Removal guard bypassed", logs.output[0])
+        self.assertIn("3 of 4", logs.output[0])
+
+    def test_bypass_still_rejects_invalid_candidate_and_preserves_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "data.csv"
+            options = ExportOptions(output_dir=Path(directory), output_path=path)
+            run_export(FakeSource(export_points()), options)
+            before = path.read_bytes()
+            invalid = [replace(export_points()[0], cost_per_task_usd=float("nan"))]
+            with self.assertLogs("export_pipeline", level="WARNING"):
+                with self.assertRaisesRegex(ValueError, "non-finite"):
+                    run_export(
+                        FakeSource(invalid),
+                        replace(options, allow_large_removals=True),
+                    )
+            self.assertEqual(path.read_bytes(), before)
+            self.assertEqual(list(path.parent.glob("*.tmp")), [])
+
     def test_fixed_output_preserves_baseline_when_candidate_validation_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "data.csv"

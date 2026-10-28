@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch:
+    inputs:
+      compare_viewports:
+        description: Compare point IDs at desktop, large, ultrawide and mobile sizes without updating the CSV
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -38,13 +43,76 @@ jobs:
           REQUIRE_BROWSER_TESTS: "1"
         run: python -m unittest discover -s tests -v
 
+      - name: Compare chart viewports
+        if: inputs.compare_viewports
+        run: |
+          python - <<'PY'
+          import csv
+          import json
+          import sys
+          from pathlib import Path
+          from unittest.mock import patch
+
+          sys.path.insert(0, "scripts")
+          import export_source
+          from export_pipeline import ExportOptions, run_export
+
+          directory = Path("out/export-diagnostics")
+          directory.mkdir(parents=True, exist_ok=True)
+          with Path("data/data.csv").open(encoding="utf-8-sig", newline="") as handle:
+              baseline_ids = {row["id"] for row in csv.DictReader(handle)}
+          comparisons = []
+          for name, width, height in (
+              ("desktop", 1600, 1200),
+              ("large", 2560, 1440),
+              ("ultrawide", 3840, 2160),
+              ("mobile", 390, 844),
+          ):
+              viewport = {"width": width, "height": height}
+              output = directory / name
+              with patch.object(export_source, "VIEWPORT", viewport):
+                  with export_source.PlaywrightChartSource(
+                      timeout=60000, diagnostics_dir=output
+                  ) as source:
+                      source._chart().scroll_into_view_if_needed()
+                      default_points = source.extract_points()
+                      result = run_export(source, ExportOptions(output_dir=output))
+              ids = {point.id for point in result.points}
+              comparison = {
+                  "name": name,
+                  "viewport": viewport,
+                  "selected_count": result.selected_count,
+                  "plotted_count": result.plotted_count,
+                  "exported_count": len(ids),
+                  "default_point_count": len(default_points),
+                  "default_ids": sorted(point.id for point in default_points),
+                  "retained_count": len(ids & baseline_ids),
+                  "missing_ids": sorted(baseline_ids - ids),
+                  "added_ids": sorted(ids - baseline_ids),
+                  "ids": sorted(ids),
+              }
+              comparisons.append(comparison)
+              (directory / "viewport-comparison.json").write_text(
+                  json.dumps(comparisons, indent=2), encoding="utf-8"
+              )
+              print(
+                  f"{name} {width}x{height}: selected={result.selected_count}, "
+                  f"default_points={len(default_points)}, points={len(ids)}, "
+                  f"retained={len(ids & baseline_ids)}, "
+                  f"missing={len(baseline_ids - ids)}",
+                  flush=True,
+              )
+          PY
+
       - name: Export source chart data to CSV
+        if: ${{ !inputs.compare_viewports }}
         shell: bash
         run: |
           for attempt in 1 2; do
             status=0
             python scripts/export_artificial_analysis_csv.py \
               --output data/data.csv \
+              --allow-large-removals \
               --diagnostics-dir out/export-diagnostics || status=$?
             if [ "$status" -eq 0 ]; then
               exit 0
@@ -66,7 +134,7 @@ jobs:
           retention-days: 7
 
       - name: Commit refreshed CSV
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && !inputs.compare_viewports
         shell: bash
         run: |
           git config user.name "github-actions[bot]"

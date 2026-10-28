@@ -303,6 +303,7 @@ export, and updates `data/data.csv` using:
 
 ```powershell
 python scripts\export_artificial_analysis_csv.py --output data\data.csv `
+  --allow-large-removals `
   --diagnostics-dir out\export-diagnostics
 ```
 
@@ -315,16 +316,20 @@ time of the committed snapshot; Actions records when unchanged data was last
 checked. The CSV columns and the original dated `--output-dir` exports are
 unchanged.
 
-Fixed-path updates refuse to overwrite the previous CSV if more than 20% of
-its IDs disappear. For intentional large removals, generate a separate
-`--output-dir` snapshot, inspect the changes, and replace the baseline only
-after human review. Validation failures also preserve the previous CSV.
+The 20% missing-ID guard is retained and enabled by default for fixed-path
+updates. The refresh workflow intentionally disables this guard by passing
+`--allow-large-removals`, so it can replace the existing CSV even if many IDs
+disappear. A bypass emits a warning and the export summary still lists removed
+IDs. Remove the flag to re-enable the guard. Empty exports, invalid IDs and
+invalid numeric data remain rejected, and validation failures preserve the
+previous CSV. To inspect large changes before applying them manually, generate
+a separate `--output-dir` snapshot first.
 When the release selector writes its selection to the page URL, the exporter
 reloads that URL and verifies that the selection survives navigation before
 extracting points.
 This verifies the selection, not that every release's benchmark data has loaded.
 The exporter currently reads rendered points after a six-second settling delay;
-the missing-ID guard remains necessary to reject suspiciously incomplete plots.
+disabling the missing-ID guard does not establish that the plot is complete.
 
 Refreshes are serialized. Browser timeouts and recognized transient network
 errors exit with status 75 and are retried once after 30 seconds; structural
@@ -335,6 +340,9 @@ seven-day retention.
 `diagnostics.json` also includes the last extracted point payload, same-origin
 document/script/fetch/XHR request URLs and lifecycle events, HTTP response
 statuses, failed-request reasons, browser exceptions and console warnings/errors.
+Selection diagnostics include selector labels before/after Select all,
+available checkbox counts and checked states, the persisted release count, and
+the selector label after reloading.
 Listeners start before navigation so dataset-loading failures are captured.
 Network URLs omit query strings and fragments; request/response headers and
 bodies are not recorded. Events are limited to 1,000 per attempt, with a dropped
@@ -343,6 +351,14 @@ Diagnostic capture failures are logged without replacing the original error.
 Manual runs use the selected workflow branch. Non-`main` runs first execute the
 test suite with browser coverage required and never commit or push CSV changes,
 so a diagnostic branch can be investigated without replacing the published data.
+Manual runs can also enable `compare_viewports` to compare 1600x1200,
+2560x1440, 3840x2160 and 390x844 browser viewports. This read-only mode skips
+the normal CSV update and commit steps, saving separate CSV/browser snapshots
+and `viewport-comparison.json` in the diagnostics artifact. Each comparison
+records the full point IDs and differences from the existing CSV; browser
+diagnostics also record the actual viewport dimensions and device pixel ratio.
+The comparison also extracts point IDs before Select all so its effect on the
+plot can be measured independently of the selector label.
 
 `deploy-pages.yml` runs after a successful export, generates `src/index.html`,
 uploads `src/` as the Pages artifact, and deploys it. It can also be started
