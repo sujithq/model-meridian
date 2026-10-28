@@ -49,6 +49,7 @@ class RefreshRetryTests(unittest.TestCase):
         self.assertIn('("large", 2560, 1440)', body)
         self.assertIn('("ultrawide", 3840, 2160)', body)
         self.assertIn("default_points = source.extract_points()", body)
+        self.assertIn("source._chart().scroll_into_view_if_needed()", body)
         export_step = workflow.split("      - name: Export source chart data to CSV\n", 1)[1]
         self.assertTrue(export_step.startswith("        if: ${{ !inputs.compare_viewports }}\n"))
         script = textwrap.dedent(body).split("python - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]

@@ -74,6 +74,7 @@ jobs:
                   with export_source.PlaywrightChartSource(
                       timeout=60000, diagnostics_dir=output
                   ) as source:
+                      source._chart().scroll_into_view_if_needed()
                       default_points = source.extract_points()
                       result = run_export(source, ExportOptions(output_dir=output))
               ids = {point.id for point in result.points}
