@@ -29,9 +29,29 @@ class RefreshRetryTests(unittest.TestCase):
         )
         self.assertIn("ref: ${{ github.ref }}", workflow)
         commit_step = workflow.split("      - name: Commit refreshed CSV\n", 1)[1]
-        self.assertTrue(commit_step.startswith("        if: github.ref == 'refs/heads/main'\n"))
+        self.assertTrue(
+            commit_step.startswith(
+                "        if: github.ref == 'refs/heads/main' && !inputs.compare_viewports\n"
+            )
+        )
         upload_step = workflow.split("      - name: Upload export diagnostics\n", 1)[1]
         self.assertTrue(upload_step.startswith("        if: always()\n"))
+
+    def test_viewport_comparison_only_writes_separate_snapshots(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "data-export.yml").read_text(
+            encoding="utf-8"
+        )
+        comparison_step = workflow.split("      - name: Compare chart viewports\n", 1)[1]
+        self.assertTrue(comparison_step.startswith("        if: inputs.compare_viewports\n"))
+        body = comparison_step.split("        run: |\n", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("ExportOptions(output_dir=output)", body)
+        self.assertNotIn("output_path=", body)
+        self.assertIn('("large", 2560, 1440)', body)
+        self.assertIn('("ultrawide", 3840, 2160)', body)
+        export_step = workflow.split("      - name: Export source chart data to CSV\n", 1)[1]
+        self.assertTrue(export_step.startswith("        if: ${{ !inputs.compare_viewports }}\n"))
+        script = textwrap.dedent(body).split("python - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
+        compile(script, "<viewport-comparison>", "exec")
 
     def run_export_step(self, statuses: str) -> subprocess.CompletedProcess[str]:
         workflow = (ROOT / ".github" / "workflows" / "data-export.yml").read_text(

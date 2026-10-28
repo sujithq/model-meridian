@@ -269,6 +269,10 @@ setTimeout(() => { throw new Error('dataset initialization failed'); }, 0);""",
                         raise RuntimeError("fixture export failed")
             details = json.loads((diagnostics / "diagnostics.json").read_text())
             self.assertEqual(details["error"], "fixture export failed")
+            self.assertEqual(
+                details["page"]["viewport"],
+                {"width": 1600, "height": 1200, "devicePixelRatio": 1},
+            )
             self.assertIn(export_source.TARGET_SECTION_ID, details["page"]["sectionIds"])
             self.assertEqual(details["page"]["plotCount"], 2)
             self.assertTrue((diagnostics / "page.png").is_file())

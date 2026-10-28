@@ -343,6 +343,12 @@ Diagnostic capture failures are logged without replacing the original error.
 Manual runs use the selected workflow branch. Non-`main` runs first execute the
 test suite with browser coverage required and never commit or push CSV changes,
 so a diagnostic branch can be investigated without replacing the published data.
+Manual runs can also enable `compare_viewports` to compare 1600x1200,
+2560x1440, 3840x2160 and 390x844 browser viewports. This read-only mode skips
+the normal CSV update and commit steps, saving separate CSV/browser snapshots
+and `viewport-comparison.json` in the diagnostics artifact. Each comparison
+records the full point IDs and differences from the existing CSV; browser
+diagnostics also record the actual viewport dimensions and device pixel ratio.
 
 `deploy-pages.yml` runs after a successful export, generates `src/index.html`,
 uploads `src/` as the Pages artifact, and deploys it. It can also be started

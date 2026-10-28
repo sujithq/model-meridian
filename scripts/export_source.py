@@ -339,6 +339,11 @@ class PlaywrightChartSource:
                 details["page"] = page.evaluate(
                     """() => ({
                       url: location.href,
+                      viewport: {
+                        width: window.innerWidth,
+                        height: window.innerHeight,
+                        devicePixelRatio: window.devicePixelRatio
+                      },
                       sectionIds: [...document.querySelectorAll('[id]')]
                         .map(node => node.id)
                         .filter(id => /intelligence|efficiency|cost|release/i.test(id)),
