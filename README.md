@@ -320,8 +320,8 @@ its IDs disappear. For intentional large removals, generate a separate
 `--output-dir` snapshot, inspect the changes, and replace the baseline only
 after human review. Validation failures also preserve the previous CSV.
 When the release selector writes its selection to the page URL, the exporter
-reloads that URL and verifies the selection before extracting points, so an
-updated selector count cannot leave it reading the previous default plot.
+reloads that URL and verifies that the selection survives navigation before
+extracting points.
 This verifies the selection, not that every release's benchmark data has loaded.
 The exporter currently reads rendered points after a six-second settling delay;
 the missing-ID guard remains necessary to reject suspiciously incomplete plots.
