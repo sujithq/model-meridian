@@ -12,6 +12,7 @@ import json
 import logging
 from pathlib import Path
 from types import TracebackType
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -358,7 +359,25 @@ class PlaywrightChartSource:
         if dialog.is_visible():
             page.keyboard.press("Escape")
             dialog.wait_for(state="hidden", timeout=DIALOG_TIMEOUT)
-        return int(selector.inner_text().strip().split()[0])
+        selected_count = int(selector.inner_text().strip().split()[0])
+
+        # The selector can update the URL and count before the plot consumes the
+        # new release set. Rehydrate from that URL instead of exporting stale dots.
+        if parse_qs(urlsplit(page.url).query).get("releases"):
+            page.reload(wait_until="domcontentloaded", timeout=self._timeout)
+            self._chart().wait_for(state="visible", timeout=self._timeout)
+            page.wait_for_function(
+                SELECTION_COMPLETE_SCRIPT,
+                arg=list(SECTION_IDS),
+                timeout=self._timeout,
+            )
+            reloaded_count = int(selector.inner_text().strip().split()[0])
+            if reloaded_count != selected_count:
+                raise RuntimeError(
+                    "Release selection changed after reloading the chart: "
+                    f"expected {selected_count}, found {reloaded_count}."
+                )
+        return selected_count
 
     def extract_points(self) -> list[ExportPoint]:
         page = self._active_page
