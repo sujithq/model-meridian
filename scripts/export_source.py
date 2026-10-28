@@ -11,10 +11,12 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from time import monotonic
 from types import TracebackType
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import Request
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
@@ -34,6 +36,7 @@ DIALOG_TIMEOUT = 60000
 SETTLE_DELAY = 6000
 VIEWPORT = {"width": 1600, "height": 1200}
 LOGGER = logging.getLogger(__name__)
+MAX_DIAGNOSTIC_EVENTS = 1000
 
 
 def is_retryable_source_error(error: Exception) -> bool:
@@ -195,16 +198,25 @@ class PlaywrightChartSource:
         self._playwright = None
         self._browser = None
         self._page = None
+        self._diagnostic_events: list[dict[str, object]] = []
+        self._dropped_diagnostic_events = 0
+        self._last_extraction: dict[str, object] | None = None
+        self._diagnostics_started = monotonic()
 
     @property
     def metadata(self) -> SourceMetadata:
         return SourceMetadata(chart=TARGET_TITLE, page=SITE_URL, slug=OUTPUT_SLUG)
 
     def __enter__(self) -> PlaywrightChartSource:
+        self._diagnostic_events.clear()
+        self._dropped_diagnostic_events = 0
+        self._last_extraction = None
+        self._diagnostics_started = monotonic()
         self._playwright = sync_playwright().start()
         try:
             self._browser = self._playwright.chromium.launch(headless=self._headless)
             self._page = self._browser.new_page(viewport=VIEWPORT)
+            self._start_diagnostics()
             self._open_chart()
         except BaseException as exc:
             if isinstance(exc, Exception):
@@ -220,12 +232,73 @@ class PlaywrightChartSource:
         traceback: TracebackType | None,
     ) -> None:
         try:
-            if isinstance(exc, Exception):
+            if exc is None or isinstance(exc, Exception):
                 self._save_diagnostics(exc)
         finally:
             self.close()
 
-    def _save_diagnostics(self, error: Exception) -> None:
+    def _record_diagnostic_event(self, event: dict[str, object]) -> None:
+        if len(self._diagnostic_events) < MAX_DIAGNOSTIC_EVENTS:
+            self._diagnostic_events.append(
+                {"elapsed_ms": round((monotonic() - self._diagnostics_started) * 1000), **event}
+            )
+        else:
+            self._dropped_diagnostic_events += 1
+
+    def _start_diagnostics(self) -> None:
+        if self._diagnostics_dir is None:
+            return
+        page = self._active_page
+        origin = urlsplit(SITE_URL)
+
+        def network_event(kind: str, request: Request, **details: object) -> None:
+            url = urlsplit(request.url)
+            if (url.scheme, url.netloc) != (origin.scheme, origin.netloc):
+                return
+            if request.resource_type not in ("document", "script", "fetch", "xhr"):
+                return
+            self._record_diagnostic_event(
+                {
+                    "event": kind,
+                    "url": urlunsplit((url.scheme, url.netloc, url.path, "", "")),
+                    "resource_type": request.resource_type,
+                    **details,
+                }
+            )
+
+        page.on("request", lambda request: network_event("request", request))
+        page.on(
+            "response",
+            lambda response: network_event(
+                "response", response.request, status=response.status
+            ),
+        )
+        page.on(
+            "requestfinished",
+            lambda request: network_event("requestfinished", request),
+        )
+        page.on(
+            "requestfailed",
+            lambda request: network_event(
+                "requestfailed", request, failure=request.failure
+            ),
+        )
+        page.on(
+            "pageerror",
+            lambda error: self._record_diagnostic_event(
+                {"event": "pageerror", "message": str(error)[:2000]}
+            ),
+        )
+        page.on(
+            "console",
+            lambda message: self._record_diagnostic_event(
+                {"event": "console", "level": message.type, "message": message.text[:2000]}
+            )
+            if message.type in ("warning", "error")
+            else None,
+        )
+
+    def _save_diagnostics(self, error: Exception | None) -> None:
         directory = self._diagnostics_dir
         if directory is None:
             return
@@ -235,7 +308,13 @@ class PlaywrightChartSource:
             LOGGER.warning("Could not create export diagnostics directory %s", directory, exc_info=True)
             return
 
-        details: dict[str, object] = {"error_type": type(error).__name__, "error": str(error)}
+        details: dict[str, object] = {
+            "error_type": type(error).__name__ if error is not None else None,
+            "error": str(error) if error is not None else None,
+            "events": self._diagnostic_events,
+            "dropped_event_count": self._dropped_diagnostic_events,
+            "extraction": self._last_extraction,
+        }
         if self._page is not None:
             page = self._page
             for filename, capture in (
@@ -383,6 +462,7 @@ class PlaywrightChartSource:
         page = self._active_page
         page.wait_for_timeout(SETTLE_DELAY)
         extraction = page.evaluate(EXTRACTION_SCRIPT, list(SECTION_IDS))
+        self._last_extraction = extraction
 
         candidate_count = int(extraction["candidateCount"])
         resolved_candidate_count = int(extraction["resolvedCandidateCount"])

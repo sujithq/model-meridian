@@ -132,6 +132,127 @@ selector.addEventListener('click', () => {{
 
 @unittest.skipUnless(chromium_available(), "Playwright Chromium is not installed")
 class PlaywrightChartSourceFixtureTests(unittest.TestCase):
+    def test_saves_diagnostics_after_a_successful_export(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "index.html"
+            diagnostics = Path(directory) / "diagnostics"
+            page.write_text(
+                fixture_html(export_source.TARGET_SECTION_ID, export_source.TARGET_TITLE),
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                export_source, "SITE_URL", page.as_uri()
+            ), mock.patch.object(export_source, "SETTLE_DELAY", 0):
+                with export_source.PlaywrightChartSource(
+                    timeout=15000, diagnostics_dir=diagnostics
+                ) as source:
+                    source.select_all()
+                    source.extract_points()
+            details = json.loads((diagnostics / "diagnostics.json").read_text())
+        self.assertIsNone(details["error"])
+        self.assertIsNone(details["error_type"])
+        self.assertEqual(len(details["extraction"]["rows"]), 3)
+
+    def test_records_dataset_loading_and_browser_errors_before_navigation(self) -> None:
+        from playwright.sync_api import sync_playwright
+
+        html = fixture_html(export_source.TARGET_SECTION_ID, export_source.TARGET_TITLE)
+        html = html.replace(
+            "render(1);",
+            """render(1);
+fetch('/data/missing.txt?token=not-for-diagnostics');
+fetch('/data/broken.txt');
+fetch('/data/ok.txt');
+console.warn('dataset warning');
+setTimeout(() => { throw new Error('dataset initialization failed'); }, 0);""",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            diagnostics = Path(directory) / "diagnostics"
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                try:
+                    with browser.new_context() as context:
+                        def serve(route) -> None:
+                            path = urlsplit(route.request.url).path
+                            if path == "/data/missing.txt":
+                                route.fulfill(status=503, body="Unavailable")
+                            elif path == "/data/broken.txt":
+                                route.abort("connectionreset")
+                            elif path == "/data/ok.txt":
+                                route.fulfill(status=200, body="{}")
+                            else:
+                                route.fulfill(
+                                    status=200, content_type="text/html", body=html
+                                )
+
+                        context.route("https://example.test/**", serve)
+                        source = export_source.PlaywrightChartSource(
+                            timeout=15000, diagnostics_dir=diagnostics
+                        )
+                        source._page = context.new_page()
+                        with mock.patch.object(
+                            export_source, "SITE_URL", "https://example.test/"
+                        ), mock.patch.object(export_source, "SETTLE_DELAY", 0):
+                            source._start_diagnostics()
+                            source._open_chart()
+                            source._page.wait_for_function(
+                                "() => performance.getEntriesByName("
+                                "'https://example.test/data/ok.txt').length > 0"
+                            )
+                            source.select_all()
+                            points = source.extract_points()
+                            source._save_diagnostics(RuntimeError("incomplete export"))
+                finally:
+                    browser.close()
+
+            details = json.loads((diagnostics / "diagnostics.json").read_text())
+
+        events = details["events"]
+        self.assertTrue(any(event["event"] == "request" for event in events))
+        self.assertTrue(
+            any(
+                event["event"] == "response"
+                and event["url"] == "https://example.test/data/missing.txt"
+                and event["status"] == 503
+                for event in events
+            )
+        )
+        self.assertTrue(
+            any(
+                event["event"] == "requestfailed"
+                and event["url"] == "https://example.test/data/broken.txt"
+                and event["failure"]
+                for event in events
+            )
+        )
+        self.assertTrue(
+            any(
+                event["event"] == "requestfinished"
+                and event["url"] == "https://example.test/data/ok.txt"
+                for event in events
+            )
+        )
+        self.assertTrue(
+            any(
+                event["event"] == "pageerror"
+                and "dataset initialization failed" in event["message"]
+                for event in events
+            )
+        )
+        self.assertTrue(
+            any(
+                event["event"] == "console" and event["message"] == "dataset warning"
+                for event in events
+            )
+        )
+        self.assertTrue(all(event["elapsed_ms"] >= 0 for event in events))
+        self.assertTrue(all("?" not in event["url"] for event in events if "url" in event))
+        self.assertEqual(details["dropped_event_count"], 0)
+        self.assertEqual(
+            [row["id"] for row in details["extraction"]["rows"]],
+            [point.id for point in points],
+        )
+
     def test_saves_diagnostics_when_export_fails_inside_an_open_source(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             page = Path(directory) / "index.html"
@@ -346,6 +467,17 @@ render(allSelected ? points.length : 1);""",
 
 @unittest.skipUnless(PLAYWRIGHT_AVAILABLE, "Playwright is not installed")
 class ExportCliTests(unittest.TestCase):
+    def test_diagnostics_are_opt_in_and_bounded(self) -> None:
+        source = export_source.PlaywrightChartSource()
+        source._page = mock.Mock()
+        source._start_diagnostics()
+        source._page.on.assert_not_called()
+        with mock.patch.object(export_source, "MAX_DIAGNOSTIC_EVENTS", 2):
+            for _ in range(3):
+                source._record_diagnostic_event({"event": "test"})
+        self.assertEqual(len(source._diagnostic_events), 2)
+        self.assertEqual(source._dropped_diagnostic_events, 1)
+
     def test_parses_fixed_output_and_diagnostics_into_configuration(self) -> None:
         config = exporter.parse_args(
             ["--output", "data.csv", "--diagnostics-dir", "diagnostics"]

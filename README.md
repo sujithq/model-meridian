@@ -320,15 +320,29 @@ its IDs disappear. For intentional large removals, generate a separate
 `--output-dir` snapshot, inspect the changes, and replace the baseline only
 after human review. Validation failures also preserve the previous CSV.
 When the release selector writes its selection to the page URL, the exporter
-reloads that URL and verifies the selection before extracting points, so an
-updated selector count cannot leave it reading the previous default plot.
+reloads that URL and verifies that the selection survives navigation before
+extracting points.
+This verifies the selection, not that every release's benchmark data has loaded.
+The exporter currently reads rendered points after a six-second settling delay;
+the missing-ID guard remains necessary to reject suspiciously incomplete plots.
 
 Refreshes are serialized. Browser timeouts and recognized transient network
 errors exit with status 75 and are retried once after 30 seconds; structural
-and data-validation failures are not retried. Failed exports save
+and data-validation failures are not retried. Exports with `--diagnostics-dir` save
 `diagnostics.json`, `page.html` and `page.png` when the browser is available.
-Actions uploads these as `export-diagnostics` with a seven-day retention.
+Actions uploads these as `export-diagnostics` on success or failure, with a
+seven-day retention.
+`diagnostics.json` also includes the last extracted point payload, same-origin
+document/script/fetch/XHR request URLs and lifecycle events, HTTP response
+statuses, failed-request reasons, browser exceptions and console warnings/errors.
+Listeners start before navigation so dataset-loading failures are captured.
+Network URLs omit query strings and fragments; request/response headers and
+bodies are not recorded. Events are limited to 1,000 per attempt, with a dropped
+event count reported if that limit is reached.
 Diagnostic capture failures are logged without replacing the original error.
+Manual runs use the selected workflow branch. Non-`main` runs first execute the
+test suite with browser coverage required and never commit or push CSV changes,
+so a diagnostic branch can be investigated without replacing the published data.
 
 `deploy-pages.yml` runs after a successful export, generates `src/index.html`,
 uploads `src/` as the Pages artifact, and deploys it. It can also be started
